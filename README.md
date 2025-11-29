@@ -54,6 +54,7 @@ reviews tablosunda rating (1-5 arası check constraint) olmalı.
 
 🔌 3. Backend (API) Bağlantı Noktaları
 Java/Spring tarafında yazılacak Controller'ların şu URL'lere cevap vermesi gerekiyor. (Frontend şu an mockData ile çalışıyor, API hazır olunca bu uçlara bağlanacak):
+
 GET	/api/spots	Tüm mekanları JSON listesi olarak döner.
 
 GET	/api/spots/search?q=...	Index kullanarak arama yapar.
