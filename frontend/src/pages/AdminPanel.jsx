@@ -105,7 +105,7 @@ const AdminPanel = () => {
                     <Grid item xs={12} md={12} sx={{ mt: 2 }}>
                         <Paper sx={{ p: 2, border: '1px dashed #1976d2' }}>
                             <Typography variant="h6" color="primary" gutterBottom>
-                                Özel Kitle Analizi (Complex Queries)
+                                Özel Kitle Analizi
                             </Typography>
                             <Box display="flex" gap={2}>
                                 <Button variant="outlined" size="small" onClick={() => alert("Sorgu: UNION ALL çalıştı.\nHem A hem B binasını kullananlar listelendi.")}>
