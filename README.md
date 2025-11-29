@@ -55,11 +55,19 @@ reviews tablosunda rating (1-5 arası check constraint) olmalı.
 🔌 3. Backend (API) Bağlantı Noktaları
 Java/Spring tarafında yazılacak Controller'ların şu URL'lere cevap vermesi gerekiyor. (Frontend şu an mockData ile çalışıyor, API hazır olunca bu uçlara bağlanacak):
 GET	/api/spots	Tüm mekanları JSON listesi olarak döner.
+
 GET	/api/spots/search?q=...	Index kullanarak arama yapar.
+
 POST	/api/reservations/create	Yeni rezervasyon ekler. Eğer DB Trigger'ı "Çakışma Var" hatası verirse, Backend 409 Conflict statü kodu ve hata mesajı dönmelidir. Frontend bu hatayı kullanıcıya gösteriyor.
+
 GET	/api/my-history	Giriş yapan kullanıcının rezervasyonlarını döner.
+
 POST	/api/reviews	Puanlama yapar. (2. Trigger burada çalışacak).
+
 POST	/api/admin/add-spot	Yeni mekan ekler (Sequence burada kullanılmalı).
+
 GET	/api/admin/stats	View üzerinden istatistikleri çeker.
+
 GET	/api/admin/reports/union	Union/Intersect sorgularının sonucunu döner.
+
 PUT	/api/user/update	Kullanıcı bilgilerini günceller (Update işlemi).
