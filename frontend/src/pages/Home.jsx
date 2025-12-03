@@ -5,6 +5,7 @@ import SpotCard from '../components/SpotCard';
 import ReservationModal from '../components/ReservationModal';
 import { mockStudySpots } from '../services/mockData';
 import { Stack, Chip } from '@mui/material'
+import { motion } from 'framer-motion';
 
 // Sistemde var olan tüm özellikleri buraya tanımlayalım (Filtre seçenekleri)
 const AVAILABLE_FEATURES = [
@@ -56,12 +57,48 @@ const Home = () => {
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            <Box mb={4} textAlign="center">
-                <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-                    Çalışma Alanları
-                </Typography>
-                <Typography variant="subtitle1" color="text.secondary">
-                    Kampüsün en verimli köşelerini keşfet ve hemen yerini ayırt.
+            {/* --- HERO SECTION --- */}
+            <Box
+                sx={{
+                    textAlign: 'center',
+                    py: 8,
+                    mb: 6,
+                    background: 'linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%)', // Hafif mor gradient arka plan
+                    borderRadius: 4,
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}
+            >
+                {/* Arka plan süsleri (Blob effect) */}
+                <Box sx={{
+                    position: 'absolute', top: -50, left: -50, width: 200, height: 200,
+                    bgcolor: 'rgba(99, 102, 241, 0.2)', borderRadius: '50%', filter: 'blur(40px)'
+                }} />
+
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.8 }}
+                >
+                    <Typography
+                        variant="h2"
+                        component="h1"
+                        gutterBottom
+                        fontWeight="900" // Ekstra kalın
+                        sx={{
+                            background: 'linear-gradient(45deg, #4f46e5 30%, #ec4899 90%)', // Yazı içi renk geçişi
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-1px'
+                        }}
+                    >
+                        Çalışma Alanını Keşfet.
+                    </Typography>
+                </motion.div>
+
+                <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto', mb: 4 }}>
+                    Kampüsün en sessiz köşeleri, en hızlı interneti ve en rahat koltukları seni bekliyor.
+                    Verimliliğini arttırmak için hemen yerini ayırt.
                 </Typography>
             </Box>
 
@@ -128,9 +165,9 @@ const Home = () => {
             {/* --- LİSTELEME (Artık 'filteredSpots' kullanıyoruz) --- */}
             <Grid container spacing={4}>
                 {filteredSpots.length > 0 ? (
-                    filteredSpots.map((spot) => (
+                    filteredSpots.map((spot, index) => (
                         <Grid item key={spot.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                            <SpotCard spot={spot} onReserve={() => handleOpenModal(spot)} />
+                            <SpotCard spot={spot} index={index} onReserve={() => handleOpenModal(spot)} />
                         </Grid>
                     ))
                 ) : (
