@@ -2,190 +2,288 @@ import React, { useState } from 'react';
 import {
     Container, Typography, Box, Tabs, Tab, Paper,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Button, IconButton, Chip, Grid
+    Button, IconButton, Chip, Grid, Avatar
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddCircleIcon from '@mui/icons-material/AddCircle';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// İkonlar
+import DeleteIcon from '@mui/icons-material/DeleteOutline'; // Daha ince ikon
+import AddCircleIcon from '@mui/icons-material/AddCircleOutline';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
-import AddSpotModal from '../components/AddSpotModal';
+import PeopleIcon from '@mui/icons-material/People';
+import EventSeatIcon from '@mui/icons-material/EventSeat';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import ScienceIcon from '@mui/icons-material/Science'; // Analiz için
 
-// Mock veriyi çekiyoruz (Başlangıç durumu için)
+// Bileşenler ve Veri
+import AddSpotModal from '../components/AddSpotModal';
 import { mockStudySpots } from '../services/mockData';
+
+// --- (StatCard Bileşenini buraya veya yukarıya yapıştırdığını varsayıyorum) ---
+const StatCard = ({ title, value, icon, color, delay }) => (
+    <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: delay }}
+        whileHover={{ y: -5 }}
+    >
+        <Paper
+            elevation={0}
+            sx={{
+                p: 3,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: `linear-gradient(135deg, ${color[0]}, ${color[1]})`,
+                color: 'white',
+                borderRadius: 4,
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden',
+                position: 'relative'
+            }}
+        >
+            <Box sx={{ position: 'absolute', right: -20, bottom: -20, opacity: 0.2, transform: 'rotate(-20deg)' }}>
+                {React.cloneElement(icon, { sx: { fontSize: 100, color: 'white' } })}
+            </Box>
+            <Box zIndex={1}>
+                <Typography variant="h3" fontWeight="bold">{value}</Typography>
+                <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>{title}</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '50%' }}>
+                {icon}
+            </Box>
+        </Paper>
+    </motion.div>
+);
 
 const AdminPanel = () => {
     const [tabIndex, setTabIndex] = useState(0);
-    // Silme işlemini simüle etmek için veriyi state'e alıyoruz
     const [spots, setSpots] = useState(mockStudySpots);
-
-    // Sekme değiştirme fonksiyonu
-    const handleTabChange = (event, newValue) => {
-        setTabIndex(newValue);
-    };
-
-    // Ekleme modalını açıp kapatmak için
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // SİLME İŞLEMİ (DELETE Kısıtı Simülasyonu)
+    const handleTabChange = (event, newValue) => setTabIndex(newValue);
+
     const handleDelete = (id) => {
-        if (window.confirm("Bu çalışma alanını silmek istediğinize emin misiniz? (Veritabanı ilişkili kayıtları kontrol edecek)")) {
-            // Gerçekte burada API'ye istek atacağız: deleteSpot(id)
-            const newSpots = spots.filter(s => s.id !== id);
-            setSpots(newSpots);
-            alert("Kayıt başarıyla silindi!");
+        if (window.confirm("Bu alanı silmek istediğinize emin misiniz?")) {
+            setSpots(spots.filter(s => s.id !== id));
         }
     };
 
-    // YENİ FONKSİYON: INSERT İŞLEMİ (Sequence Simülasyonu)
     const handleAddSpot = (newSpotData) => {
-        // Veritabanındaki SEQUENCE mantığı: Son ID'yi bul + 1 ekle
         const newId = spots.length > 0 ? Math.max(...spots.map(s => s.id)) + 1 : 1;
-
-        const spotWithId = { ...newSpotData, id: newId };
-
-        // State'i güncelle (Listeye ekle)
-        setSpots([...spots, spotWithId]);
-
-        alert(`Başarılı! Yeni alan eklendi. (ID: ${newId})`);
+        setSpots([...spots, { ...newSpotData, id: newId }]);
     };
 
-    // İSTATİSTİK KARTLARI (Aggregate Fonksiyon Simülasyonu)
-    const StatCard = ({ title, value, desc, color }) => (
-        <Paper elevation={3} sx={{ p: 3, textAlign: 'center', bgcolor: color, color: 'white' }}>
-            <Typography variant="h3" fontWeight="bold">{value}</Typography>
-            <Typography variant="h6">{title}</Typography>
-            <Typography variant="caption" sx={{ opacity: 0.8 }}>{desc}</Typography>
-        </Paper>
-    );
-
     return (
-        <Container maxWidth="lg" sx={{ mt: 4 }}>
-            <Typography variant="h4" gutterBottom fontWeight="bold" color="primary.main">
-                Yönetim Paneli
-            </Typography>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
 
-            {/* Sekmeler */}
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-                <Tabs value={tabIndex} onChange={handleTabChange} centered>
-                    <Tab icon={<AssessmentIcon />} label="Genel Durum & Raporlar" />
-                    <Tab icon={<TableRestaurantIcon />} label="Çalışma Alanı Yönetimi" />
-                </Tabs>
+            {/* BAŞLIK ALANI */}
+            <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
+                <Box>
+                    <Typography variant="h4" fontWeight="900" sx={{ color: '#1e293b' }}>
+                        Yönetim Paneli
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Sistem istatistikleri ve mekan yönetimi
+                    </Typography>
+                </Box>
+                {/* Kullanıcıya ufak bir tarih göstergesi */}
+                <Chip label={new Date().toLocaleDateString('tr-TR')} variant="outlined" />
             </Box>
 
-            {/* --- SEKME 1: RAPORLAR (Dashboard) --- */}
-            {tabIndex === 0 && (
-                <Grid container spacing={3}>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                        {/* SELECT COUNT(*) FROM reservations */}
-                        <StatCard
-                            title="Aktif Rezervasyon"
-                            value="12"
-                            desc="Şu an sistemdeki toplam doluluk"
-                            color="#2E3B55"
-                        />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                        {/* SELECT AVG(rating) FROM reviews */}
-                        <StatCard
-                            title="Ortalama Memnuniyet"
-                            value="4.8/5.0"
-                            desc="Son 30 günlük verimlilik puanları"
-                            color="#2E7D32"
-                        />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 4 }}>
-                        {/* SELECT COUNT(*) FROM users WHERE role='STUDENT' */}
-                        <StatCard
-                            title="Kayıtlı Öğrenci"
-                            value="345"
-                            desc="Sistemi kullanan toplam öğrenci"
-                            color="#ed6c02"
-                        />
-                    </Grid>
-                    <Grid item size={{ xs: 12, md: 12 }} sx={{ mt: 2 }}>
-                        <Paper sx={{ p: 2, border: '1px dashed #1976d2' }}>
-                            <Typography variant="h6" color="primary" gutterBottom>
-                                Özel Kitle Analizi
-                            </Typography>
-                            <Box display="flex" gap={2}>
-                                <Button variant="outlined" size="small" onClick={() => alert("Sorgu: UNION ALL çalıştı.\nHem A hem B binasını kullananlar listelendi.")}>
-                                    Tüm Salonları Kullananlar (UNION)
-                                </Button>
-                                <Button variant="outlined" size="small" onClick={() => alert("Sorgu: INTERSECT çalıştı.\nHem geçen ay hem bu ay rezervasyon yapan sadık öğrenciler.")}>
-                                    Sadık Öğrenciler (INTERSECT)
-                                </Button>
-                                <Button variant="outlined" size="small" color="error" onClick={() => alert("Sorgu: EXCEPT çalıştı.\nKayıtlı olup hiç rezervasyon yapmayanlar.")}>
-                                    Pasif Kullanıcılar (EXCEPT)
-                                </Button>
-                            </Box>
-                        </Paper>
-                    </Grid>
-                    <Grid item size={{ xs: 12 }} sx={{ mt: 2 }}>
-                        <Paper sx={{ p: 2, bgcolor: '#f5f5f5' }}>
-                            <Typography variant="subtitle2" color="text.secondary">
-                                ℹ️ <strong>Sistem Notu:</strong> Yukarıdaki veriler <code>view_daily_stats</code> isimli veritabanı View'inden çekilmektedir.
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                </Grid>
-            )}
+            {/* MODERN SEKMELER */}
+            <Paper
+                elevation={0}
+                sx={{
+                    borderRadius: 4,
+                    mb: 4,
+                    bgcolor: 'white',
+                    border: '1px solid #e2e8f0',
+                    p: 0.5
+                }}
+            >
+                <Tabs
+                    value={tabIndex}
+                    onChange={handleTabChange}
+                    centered
+                    TabIndicatorProps={{ sx: { height: 0 } }} // Alt çizgiyi gizle
+                    sx={{
+                        '& .Mui-selected': {
+                            bgcolor: 'primary.main',
+                            color: 'white !important',
+                            borderRadius: 3
+                        },
+                        '& .MuiTab-root': {
+                            borderRadius: 3,
+                            transition: 'all 0.3s',
+                            mx: 1
+                        }
+                    }}
+                >
+                    <Tab icon={<AssessmentIcon sx={{ mb: 0, mr: 1 }} />} iconPosition="start" label="Dashboard" />
+                    <Tab icon={<TableRestaurantIcon sx={{ mb: 0, mr: 1 }} />} iconPosition="start" label="Mekan Yönetimi" />
+                </Tabs>
+            </Paper>
 
-            {/* --- SEKME 2: YÖNETİM (CRUD Tablosu) --- */}
-            {tabIndex === 1 && (
-                <Box>
-                    <Box display="flex" justifyContent="flex-end" mb={2}>
-                        <Button variant="contained" startIcon={<AddCircleIcon />} color="primary" onClick={() => setIsAddModalOpen(true)}>
-                            Yeni Alan Ekle
-                        </Button>
-                    </Box>
+            {/* İÇERİK ALANI (AnimatePresence ile geçiş efekti) */}
+            <AnimatePresence mode="wait">
 
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead sx={{ backgroundColor: '#e0e0e0' }}>
-                                <TableRow>
-                                    <TableCell><strong>ID</strong></TableCell>
-                                    <TableCell><strong>Alan Adı</strong></TableCell>
-                                    <TableCell><strong>Kapasite</strong></TableCell>
-                                    <TableCell><strong>Özellikler</strong></TableCell>
-                                    <TableCell><strong>Durum</strong></TableCell>
-                                    <TableCell align="right"><strong>İşlemler</strong></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {spots.map((spot) => (
-                                    <TableRow key={spot.id}>
-                                        <TableCell>{spot.id}</TableCell>
-                                        <TableCell>{spot.name}</TableCell>
-                                        <TableCell>{spot.capacity} Kişi</TableCell>
-                                        <TableCell>
-                                            {spot.features.map((f, i) => (
-                                                <span key={i} style={{ fontSize: '12px', marginRight: '4px' }}>• {f}</span>
-                                            ))}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={spot.isAvailable ? "Aktif" : "Bakımda/Dolu"}
-                                                color={spot.isAvailable ? "success" : "warning"}
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            <IconButton color="error" onClick={() => handleDelete(spot.id)}>
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </TableCell>
+                {/* --- SEKME 1: DASHBOARD --- */}
+                {tabIndex === 0 && (
+                    <motion.div
+                        key="dashboard"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        <Grid container spacing={3}>
+                            <Grid item size={{ xs: 12, md: 4 }}>
+                                <StatCard
+                                    title="Aktif Rezervasyon"
+                                    value="12"
+                                    icon={<EventSeatIcon />}
+                                    color={['#6366f1', '#4f46e5']} // Indigo Gradient
+                                    delay={0.1}
+                                />
+                            </Grid>
+                            <Grid item size={{ xs: 12, md: 4 }}>
+                                <StatCard
+                                    title="Ortalama Puan"
+                                    value="4.8"
+                                    icon={<TrendingUpIcon />}
+                                    color={['#14b8a6', '#0d9488']} // Teal Gradient
+                                    delay={0.2}
+                                />
+                            </Grid>
+                            <Grid item size={{ xs: 12, md: 4 }}>
+                                <StatCard
+                                    title="Kayıtlı Öğrenci"
+                                    value="345"
+                                    icon={<PeopleIcon />}
+                                    color={['#f59e0b', '#d97706']} // Orange Gradient
+                                    delay={0.3}
+                                />
+                            </Grid>
+
+                            {/* ANALİZ BUTONLARI */}
+                            <Grid item size={{ xs: 12 }} sx={{ mt: 2 }}>
+                                <Paper sx={{ p: 4, borderRadius: 4, border: '1px dashed #cbd5e1' }} elevation={0}>
+                                    <Box display="flex" alignItems="center" gap={2} mb={2}>
+                                        <Avatar sx={{ bgcolor: 'secondary.light' }}><ScienceIcon /></Avatar>
+                                        <Typography variant="h6" fontWeight="bold">Özel Veritabanı Analizleri</Typography>
+                                    </Box>
+                                    <Grid container spacing={2}>
+                                        {['Tüm Salonları Kullananlar (UNION)', 'Sadık Öğrenciler (INTERSECT)', 'Pasif Kullanıcılar (EXCEPT)'].map((text, i) => (
+                                            <Grid item size={{ xs: 12, sm: 4 }} key={i}>
+                                                <Button
+                                                    fullWidth
+                                                    variant="outlined"
+                                                    sx={{
+                                                        justifyContent: 'flex-start',
+                                                        py: 1.5,
+                                                        borderRadius: 2,
+                                                        borderColor: '#cbd5e1',
+                                                        color: '#475569',
+                                                        '&:hover': { borderColor: 'primary.main', color: 'primary.main', bgcolor: '#f1f5f9' }
+                                                    }}
+                                                    onClick={() => alert("Sorgu veritabanına gönderildi.")}
+                                                >
+                                                    {text}
+                                                </Button>
+                                            </Grid>
+                                        ))}
+                                    </Grid>
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </motion.div>
+                )}
+
+                {/* --- SEKME 2: YÖNETİM --- */}
+                {tabIndex === 1 && (
+                    <motion.div
+                        key="management"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        <Box display="flex" justifyContent="flex-end" mb={3}>
+                            <Button
+                                variant="contained"
+                                startIcon={<AddCircleIcon />}
+                                onClick={() => setIsAddModalOpen(true)}
+                                sx={{
+                                    borderRadius: 3,
+                                    px: 3, py: 1,
+                                    background: 'linear-gradient(45deg, #4f46e5 30%, #6366f1 90%)',
+                                    boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)'
+                                }}
+                            >
+                                Yeni Alan Ekle
+                            </Button>
+                        </Box>
+
+                        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                            <Table>
+                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                    <TableRow>
+                                        {['ID', 'Alan Adı', 'Kapasite', 'Özellikler', 'Durum', 'İşlemler'].map((head) => (
+                                            <TableCell key={head} sx={{ fontWeight: 'bold', color: '#64748b' }}>{head}</TableCell>
+                                        ))}
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                    <AddSpotModal
-                        open={isAddModalOpen}
-                        handleClose={() => setIsAddModalOpen(false)}
-                        onAdd={handleAddSpot}
-                    />
-                </Box>
-            )}
+                                </TableHead>
+                                <TableBody>
+                                    {spots.map((spot) => (
+                                        <TableRow key={spot.id} sx={{ '&:hover': { bgcolor: '#f1f5f9' }, transition: '0.2s' }}>
+                                            <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>#{spot.id}</TableCell>
+                                            <TableCell>{spot.name}</TableCell>
+                                            <TableCell>
+                                                <Chip label={`${spot.capacity} Kişi`} size="small" sx={{ bgcolor: '#e0e7ff', color: '#4338ca', fontWeight: 'bold' }} />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Box display="flex" gap={0.5} flexWrap="wrap">
+                                                    {spot.features.slice(0, 2).map((f, i) => (
+                                                        <Chip key={i} label={f} size="small" variant="outlined" sx={{ fontSize: 10, height: 20 }} />
+                                                    ))}
+                                                    {spot.features.length > 2 && <Chip label={`+${spot.features.length - 2}`} size="small" sx={{ fontSize: 10, height: 20 }} />}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Box display="flex" alignItems="center" gap={1}>
+                                                    {spot.isAvailable ? <CheckCircleIcon color="success" fontSize="small" /> : <CancelIcon color="error" fontSize="small" />}
+                                                    <Typography variant="caption" fontWeight="bold" color={spot.isAvailable ? 'success.main' : 'error.main'}>
+                                                        {spot.isAvailable ? 'Aktif' : 'Dolu'}
+                                                    </Typography>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleDelete(spot.id)}
+                                                    sx={{ color: '#ef4444', bgcolor: '#fee2e2', '&:hover': { bgcolor: '#fecaca' } }}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+
+                        <AddSpotModal
+                            open={isAddModalOpen}
+                            handleClose={() => setIsAddModalOpen(false)}
+                            onAdd={handleAddSpot}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </Container>
     );
 };

@@ -1,78 +1,113 @@
 import React, { useState } from 'react';
-import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
-import { useAuth } from '../context/AuthContext'; // Context'i çek
-import { useNavigate } from 'react-router-dom'; // Sayfa değiştirmek için
+import { Container, Paper, TextField, Button, Typography, Box, Alert, Avatar } from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-
-    const { login } = useAuth(); // Context'ten login fonksiyonunu al
-    const navigate = useNavigate(); // Yönlendirme aracı
+    const { login } = useAuth();
+    const navigate = useNavigate();
 
     const handleLogin = (e) => {
         e.preventDefault();
-
-        // Login fonksiyonunu çalıştır
         const success = login(email, password);
-
         if (success) {
-            // Eğer e-posta içinde "admin" geçiyorsa Admin paneline, yoksa Ana sayfaya at
-            if (email.includes("admin")) {
-                navigate('/admin');
-            } else {
-                navigate('/');
-            }
+            if (email.includes("admin")) navigate('/admin');
+            else navigate('/');
         }
     };
 
     return (
-        <Container maxWidth="xs">
-            <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Paper elevation={3} sx={{ padding: 4, width: '100%', textAlign: 'center' }}>
+        <Box
+            sx={{
+                minHeight: '80vh', // Ekranı kaplasın
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'radial-gradient(circle at 50% 50%, #e0e7ff 0%, #f8fafc 100%)' // Hafif glow efekti
+            }}
+        >
+            <Container maxWidth="xs">
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                >
+                    <Paper
+                        elevation={0} // Gölgeyi biz CSS ile vereceğiz
+                        sx={{
+                            padding: 4,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            borderRadius: 4,
+                            border: '1px solid rgba(255,255,255,0.8)',
+                            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)' // Soft gölge
+                        }}
+                    >
 
-                    <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-                        StudyFlow Giriş
-                    </Typography>
+                        <Avatar sx={{ m: 1, bgcolor: 'primary.main', width: 56, height: 56, mb: 2 }}>
+                            <LockOutlinedIcon fontSize="large" />
+                        </Avatar>
 
-                    {/* Bilgilendirme Notu */}
-                    <Alert severity="info" sx={{ mb: 2, fontSize: '0.8rem', textAlign: 'left' }}>
-                        <strong>İpucu:</strong> Admin olmak için e-posta kısmına "admin" yazın (örn: admin@uni.edu). Öğrenci için rastgele bir şey yazın.
-                    </Alert>
+                        <Typography component="h1" variant="h5" fontWeight="bold" color="text.primary">
+                            Tekrar Hoşgeldin!
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                            StudyFlow hesabına giriş yap
+                        </Typography>
 
-                    <form onSubmit={handleLogin}>
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            label="E-Posta Adresi"
-                            autoFocus
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            label="Şifre"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
+                        <Alert severity="info" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
+                            Admin: <b>admin@uni.edu</b> <br /> Öğrenci: Rastgele bir mail
+                        </Alert>
 
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            sx={{ mt: 3, mb: 2, py: 1.5, fontWeight: 'bold' }}
-                        >
-                            Giriş Yap
-                        </Button>
-                    </form>
+                        <Box component="form" onSubmit={handleLogin} sx={{ mt: 1, width: '100%' }}>
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                label="E-Posta Adresi"
+                                autoFocus
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': { borderRadius: 3 } // İnputlar yuvarlak
+                                }}
+                            />
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                label="Şifre"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': { borderRadius: 3 }
+                                }}
+                            />
 
-                </Paper>
-            </Box>
-        </Container>
+                            <Button
+                                type="submit"
+                                fullWidth
+                                variant="contained"
+                                size="large"
+                                sx={{
+                                    mt: 3, mb: 2, py: 1.5, fontSize: '1rem',
+                                    background: 'linear-gradient(45deg, #4f46e5 30%, #6366f1 90%)',
+                                    boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)'
+                                }}
+                            >
+                                Giriş Yap
+                            </Button>
+                        </Box>
+                    </Paper>
+                </motion.div>
+            </Container>
+        </Box>
     );
 };
 
