@@ -75,7 +75,7 @@ const AdminPanel = () => {
             {/* --- SEKME 1: RAPORLAR (Dashboard) --- */}
             {tabIndex === 0 && (
                 <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
                         {/* SELECT COUNT(*) FROM reservations */}
                         <StatCard
                             title="Aktif Rezervasyon"
@@ -84,7 +84,7 @@ const AdminPanel = () => {
                             color="#2E3B55"
                         />
                     </Grid>
-                    <Grid item xs={12} md={4}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
                         {/* SELECT AVG(rating) FROM reviews */}
                         <StatCard
                             title="Ortalama Memnuniyet"
@@ -93,7 +93,7 @@ const AdminPanel = () => {
                             color="#2E7D32"
                         />
                     </Grid>
-                    <Grid item xs={12} md={4}>
+                    <Grid item size={{ xs: 12, md: 4 }}>
                         {/* SELECT COUNT(*) FROM users WHERE role='STUDENT' */}
                         <StatCard
                             title="Kayıtlı Öğrenci"
@@ -102,7 +102,7 @@ const AdminPanel = () => {
                             color="#ed6c02"
                         />
                     </Grid>
-                    <Grid item xs={12} md={12} sx={{ mt: 2 }}>
+                    <Grid item size={{ xs: 12, md: 12 }} sx={{ mt: 2 }}>
                         <Paper sx={{ p: 2, border: '1px dashed #1976d2' }}>
                             <Typography variant="h6" color="primary" gutterBottom>
                                 Özel Kitle Analizi
@@ -120,7 +120,7 @@ const AdminPanel = () => {
                             </Box>
                         </Paper>
                     </Grid>
-                    <Grid item xs={12} sx={{ mt: 2 }}>
+                    <Grid item size={{ xs: 12 }} sx={{ mt: 2 }}>
                         <Paper sx={{ p: 2, bgcolor: '#f5f5f5' }}>
                             <Typography variant="subtitle2" color="text.secondary">
                                 ℹ️ <strong>Sistem Notu:</strong> Yukarıdaki veriler <code>view_daily_stats</code> isimli veritabanı View'inden çekilmektedir.

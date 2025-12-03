@@ -129,13 +129,13 @@ const Home = () => {
             <Grid container spacing={4}>
                 {filteredSpots.length > 0 ? (
                     filteredSpots.map((spot) => (
-                        <Grid item key={spot.id} xs={12} sm={6} md={4}>
+                        <Grid item key={spot.id} size={{ xs: 12, sm: 6, md: 4 }}>
                             <SpotCard spot={spot} onReserve={() => handleOpenModal(spot)} />
                         </Grid>
                     ))
                 ) : (
                     // Hiç sonuç yoksa kullanıcıya bilgi verelim
-                    <Grid item xs={12}>
+                    <Grid item size={{ xs: 12 }}>
                         <Box textAlign="center" py={5}>
                             <Typography variant="h6" color="text.secondary">
                                 Aradığınız kriterlere uygun mekan bulunamadı.
