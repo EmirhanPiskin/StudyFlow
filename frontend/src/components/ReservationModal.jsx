@@ -4,15 +4,40 @@ import {
     Button, TextField, Typography, Alert, Box
 } from '@mui/material';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import { Service } from '../services/api';
+import { useAuth } from '../context/AuthContext'; // <--- 1. AuthContext EKLENDİ
 
 const ReservationModal = ({ open, handleClose, spot }) => {
+    const { user } = useAuth(); // <--- 2. Kullanıcı bilgisi alındı
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
 
-    const handleSubmit = () => {
-        // ... eski mantık aynı ...
-        alert(`Rezervasyon İsteği Gönderildi!\n\nMasa: ${spot.name}`);
-        handleClose();
+    const handleSubmit = async () => {
+        // Basit validasyon
+        if (!startTime || !endTime) {
+            alert("Lütfen saatleri seçiniz.");
+            return;
+        }
+
+        const reservationData = {
+            userId: user ? user.id : 1, // <--- 3. ARTIK DİNAMİK! (Ahmet'se 2 gider)
+            spotId: spot.id,
+            start: startTime,
+            end: endTime
+        };
+
+        try {
+            await Service.createReservation(reservationData);
+            alert(`✅ Rezervasyon Başarılı!\nMasa: ${spot.name}`);
+            handleClose();
+        } catch (error) {
+            if (error.response && error.response.status === 409) {
+                alert(`❌ HATA: ${error.response.data.detail}`);
+            } else {
+                alert("Beklenmedik bir hata oluştu.");
+                console.error(error);
+            }
+        }
     };
 
     if (!spot) return null;
@@ -25,13 +50,12 @@ const ReservationModal = ({ open, handleClose, spot }) => {
             maxWidth="sm"
             PaperProps={{
                 sx: {
-                    borderRadius: 4, // Köşeleri iyice yuvarla
+                    borderRadius: 4,
                     padding: 1,
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                 }
             }}
         >
-            {/* Özel Başlık Alanı */}
             <Box sx={{ bgcolor: '#f1f5f9', p: 3, borderRadius: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box sx={{ bgcolor: 'white', p: 1, borderRadius: 2, color: 'primary.main' }}>
                     <EventAvailableIcon />

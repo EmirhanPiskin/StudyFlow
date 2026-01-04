@@ -1,220 +1,217 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Container, Typography, Box, Paper, Button, Chip,
-    Dialog, DialogTitle, DialogContent, DialogActions, Rating, Avatar, Grid
+    Container, Typography, Box, Paper, Chip, Button,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Rating, TextField, Grid, Avatar
 } from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// İkonlar
-import EventIcon from '@mui/icons-material/Event';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import { Service } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import EventNoteIcon from '@mui/icons-material/EventNote';
 import PlaceIcon from '@mui/icons-material/Place';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import StarRateIcon from '@mui/icons-material/StarRate';
-import BookmarkAddedIcon from '@mui/icons-material/BookmarkAdded';
-
-// Mock Veri
-const initialReservations = [
-    { id: 101, spotName: "Kütüphane - Masa 12", date: "2023-11-25", time: "14:00 - 16:00", status: "AKTİF", image: "https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=100&q=80" },
-    { id: 102, spotName: "Çalışma Odası B", date: "2023-11-28", time: "09:00 - 12:00", status: "BEKLEMEDE", image: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=100&q=80" },
-    { id: 103, spotName: "Bahçe Alanı", date: "2023-10-15", time: "10:00 - 11:00", status: "TAMAMLANDI", image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=100&q=80" },
-];
 
 const MyReservations = () => {
-    const [reservations, setReservations] = useState(initialReservations);
-    const [ratingModalOpen, setRatingModalOpen] = useState(false);
-    const [selectedResId, setSelectedResId] = useState(null);
-    const [score, setScore] = useState(0);
+    const { user } = useAuth();
+    const [reservations, setReservations] = useState([]);
 
-    // --- İŞLEM FONKSİYONLARI ---
-    const handleCancel = (id) => {
-        if (window.confirm("Rezervasyonu iptal etmek istediğine emin misin?")) {
-            setReservations(reservations.filter(r => r.id !== id));
+    // Modal State'leri
+    const [open, setOpen] = useState(false);
+    const [selectedRes, setSelectedRes] = useState(null);
+    const [rating, setRating] = useState(5);
+    const [comment, setComment] = useState(""); // <--- YENİ: Yorum State'i
+
+    useEffect(() => {
+        if (user) fetchReservations();
+    }, [user]);
+
+    const fetchReservations = async () => {
+        try {
+            const data = await Service.getHistory(user.id);
+            setReservations(data);
+        } catch (error) {
+            console.error("Geçmiş çekilemedi", error);
         }
     };
 
-    const handleRateClick = (id) => {
-        setSelectedResId(id);
-        setRatingModalOpen(true);
+    const handleOpenModal = (res) => {
+        setSelectedRes(res);
+        setRating(5);
+        setComment(""); // Modal açıldığında yorumu sıfırla
+        setOpen(true);
     };
 
-    const submitRating = () => {
-        alert(`Puanınız (${score} Yıldız) kaydedildi! (Trigger Tetiklendi)`);
-        setRatingModalOpen(false);
-        setScore(0);
+    const handleCloseModal = () => {
+        setOpen(false);
+        setSelectedRes(null);
     };
 
-    // Renk ve İkon Belirleme
-    const getStatusConfig = (status) => {
-        switch (status) {
-            case 'AKTİF': return { color: 'success', label: 'Aktif', bg: '#dcfce7', text: '#166534' };
-            case 'BEKLEMEDE': return { color: 'warning', label: 'Beklemede', bg: '#fef3c7', text: '#92400e' };
-            case 'TAMAMLANDI': return { color: 'default', label: 'Tamamlandı', bg: '#f1f5f9', text: '#475569' };
-            default: return { color: 'default', label: status, bg: '#eee', text: '#333' };
+    const handleSubmitReview = async () => {
+        if (!selectedRes) return;
+
+        try {
+            await Service.addReview({
+                userId: user.id,
+                spotId: selectedRes.spotId,
+                reservationId: selectedRes.id,
+                rating: rating,
+                comment: comment // <--- Yorum Backend'e gidiyor
+            });
+
+            alert("Değerlendirmeniz alındı! Puanınız mekana yansıdı.");
+            setOpen(false);
+            fetchReservations(); // Listeyi yenile (Buton "Puanlandı" olsun diye)
+        } catch (error) {
+            alert(error.response?.data?.detail || "Hata oluştu");
         }
     };
+
+    const handleCancel = async (id) => {
+        if (window.confirm("Bu rezervasyonu iptal etmek istediğinize emin misiniz?")) {
+            try {
+                await Service.cancelReservation(id);
+                alert("Rezervasyon iptal edildi.");
+                fetchReservations(); // Listeyi yenile ki durumu 'İPTAL' olarak görelim
+            } catch (error) {
+                alert("İptal işlemi başarısız: " + error);
+            }
+        }
+    };
+
+    if (!user) return <Typography sx={{ mt: 5, textAlign: 'center' }}>Lütfen giriş yapın.</Typography>;
 
     return (
         <Container maxWidth="md" sx={{ mt: 5, mb: 10 }}>
+            <Typography variant="h4" fontWeight="bold" gutterBottom mb={4}>
+                Rezervasyon Geçmişim 📅
+            </Typography>
 
-            {/* BAŞLIK ALANI */}
-            <Box mb={5} textAlign="center">
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-                    <Typography variant="h4" fontWeight="900" sx={{ color: '#1e293b', mb: 1 }}>
-                        Rezervasyonlarım
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Gelecek planların ve geçmiş çalışma oturumların burada listelenir.
-                    </Typography>
-                </motion.div>
-            </Box>
+            {reservations.length === 0 ? (
+                <Paper sx={{ p: 5, textAlign: 'center', bgcolor: '#f8fafc' }}>
+                    <Typography color="text.secondary">Henüz bir rezervasyonunuz yok.</Typography>
+                </Paper>
+            ) : (
+                <Grid container spacing={3}>
+                    {reservations.map((res) => (
+                        <Grid item size={{ xs: 12 }} key={res.id}>
+                            <Paper
+                                elevation={2}
+                                sx={{
+                                    p: 3,
+                                    borderRadius: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: 2
+                                }}
+                            >
+                                {/* SOL: RESİM VE BİLGİ */}
+                                <Box display="flex" alignItems="center" gap={3}>
+                                    <Avatar
+                                        src={res.image}
+                                        variant="rounded"
+                                        sx={{ width: 80, height: 80, borderRadius: 3 }}
+                                    />
+                                    <Box>
+                                        <Typography variant="h6" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
+                                            <PlaceIcon fontSize="small" color="primary" />
+                                            {res.spotName}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" display="flex" alignItems="center" gap={0.5} mt={0.5}>
+                                            <EventNoteIcon fontSize="small" />
+                                            {res.date} | {res.time}
+                                        </Typography>
+                                        <Chip
+                                            label={res.status}
+                                            size="small"
+                                            color={res.status === 'TAMAMLANDI' ? 'success' : res.status === 'İPTAL' ? 'error' : 'warning'}
+                                            sx={{ mt: 1, fontWeight: 'bold' }}
+                                        />
+                                    </Box>
+                                </Box>
 
-            {/* LİSTELEME ALANI */}
-            <Box display="flex" flexDirection="column" gap={3}>
-                <AnimatePresence>
-                    {reservations.length > 0 ? (
-                        reservations.map((res, index) => {
-                            const config = getStatusConfig(res.status);
-                            return (
-                                <motion.div
-                                    key={res.id}
-                                    initial={{ opacity: 0, x: -50 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                                    transition={{ duration: 0.4, delay: index * 0.1 }}
-                                >
-                                    <Paper
-                                        elevation={0}
-                                        sx={{
-                                            p: 3,
-                                            borderRadius: 4,
-                                            border: '1px solid #e2e8f0',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 3,
-                                            transition: 'all 0.3s',
-                                            '&:hover': {
-                                                transform: 'translateY(-4px)',
-                                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                                                borderColor: 'primary.light'
-                                            },
-                                            flexWrap: 'wrap' // Mobilde alt alta geçsin
-                                        }}
-                                    >
-                                        {/* 1. Kısım: Resim ve Tarih */}
-                                        <Box display="flex" alignItems="center" gap={2} minWidth={200}>
-                                            <Avatar
-                                                src={res.image}
-                                                variant="rounded"
-                                                sx={{ width: 60, height: 60, borderRadius: 3 }}
-                                            />
-                                            <Box>
-                                                <Typography variant="h6" fontWeight="bold" color="text.primary">
-                                                    {res.date}
-                                                </Typography>
-                                                <Box display="flex" alignItems="center" gap={0.5} color="text.secondary">
-                                                    <AccessTimeIcon fontSize="small" />
-                                                    <Typography variant="body2">{res.time}</Typography>
-                                                </Box>
-                                            </Box>
-                                        </Box>
+                                {/* SAĞ: AKSİYON BUTONU */}
+                                <Box>
+                                    {res.status === 'TAMAMLANDI' && !res.hasReviewed && (
+                                        <Button
+                                            variant="contained"
+                                            color="secondary"
+                                            onClick={() => handleOpenModal(res)}
+                                            sx={{ borderRadius: 2, textTransform: 'none' }}
+                                        >
+                                            Puanla & Yorum Yap
+                                        </Button>
+                                    )}
 
-                                        {/* 2. Kısım: Mekan Bilgisi (Orta) */}
-                                        <Box flexGrow={1}>
-                                            <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
-                                                <PlaceIcon color="action" fontSize="small" />
-                                                <Typography variant="subtitle1" fontWeight="600">
-                                                    {res.spotName}
-                                                </Typography>
-                                            </Box>
-                                            <Chip
-                                                label={config.label}
-                                                size="small"
-                                                sx={{
-                                                    bgcolor: config.bg,
-                                                    color: config.text,
-                                                    fontWeight: 'bold',
-                                                    borderRadius: 2
-                                                }}
-                                            />
-                                        </Box>
+                                    {res.status === 'TAMAMLANDI' && res.hasReviewed && (
+                                        <Typography variant="caption" sx={{ color: 'green', fontWeight: 'bold', display: 'block', textAlign: 'center' }}>
+                                            ✅ Değerlendirildi
+                                        </Typography>
+                                    )}
 
-                                        {/* 3. Kısım: Aksiyon Butonları (Sağ) */}
-                                        <Box display="flex" gap={1}>
-                                            {(res.status === 'AKTİF' || res.status === 'BEKLEMEDE') && (
-                                                <Button
-                                                    variant="outlined"
-                                                    color="error"
-                                                    startIcon={<DeleteOutlineIcon />}
-                                                    onClick={() => handleCancel(res.id)}
-                                                    sx={{ borderRadius: 3, textTransform: 'none' }}
-                                                >
-                                                    İptal
-                                                </Button>
-                                            )}
+                                    {res.status === 'AKTİF' && (
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            size="small"
+                                            onClick={() => handleCancel(res.id)} // <--- BU SATIRI EKLE
+                                        >
+                                            İptal Et
+                                        </Button>
+                                    )}
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
 
-                                            {res.status === 'TAMAMLANDI' && (
-                                                <Button
-                                                    variant="contained"
-                                                    color="secondary"
-                                                    startIcon={<StarRateIcon />}
-                                                    onClick={() => handleRateClick(res.id)}
-                                                    sx={{
-                                                        borderRadius: 3,
-                                                        textTransform: 'none',
-                                                        background: 'linear-gradient(45deg, #f59e0b 30%, #d97706 90%)', // Altın Sarısı
-                                                        boxShadow: '0 4px 10px rgba(245, 158, 11, 0.3)'
-                                                    }}
-                                                >
-                                                    Puanla
-                                                </Button>
-                                            )}
-                                        </Box>
-                                    </Paper>
-                                </motion.div>
-                            );
-                        })
-                    ) : (
-                        // BOŞ DURUM (Empty State)
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <Box textAlign="center" py={8} sx={{ opacity: 0.6 }}>
-                                <BookmarkAddedIcon sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
-                                <Typography variant="h6">Henüz bir rezervasyonun yok.</Typography>
-                                <Typography variant="body2">Hemen bir çalışma alanı seç ve verimliliğe başla!</Typography>
-                            </Box>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </Box>
-
-            {/* PUANLAMA MODALI */}
-            <Dialog
-                open={ratingModalOpen}
-                onClose={() => setRatingModalOpen(false)}
-                PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
-            >
-                <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>
-                    Deneyiminizi Puanlayın
+            {/* --- DEĞERLENDİRME MODALI --- */}
+            <Dialog open={open} onClose={handleCloseModal} fullWidth maxWidth="sm">
+                <DialogTitle sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+                    Deneyimini Paylaş ✨
                 </DialogTitle>
-                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 2, minWidth: 300 }}>
-                    <Rating
-                        name="size-large"
-                        value={score}
-                        onChange={(event, newValue) => setScore(newValue)}
-                        size="large"
-                        sx={{ fontSize: '3rem', mb: 2 }}
-                    />
-                    <Typography variant="body2" color="text.secondary" align="center">
-                        Bu işlem veritabanında "Reviews" tablosuna kayıt atar ve <br /> <b>Trigger</b> çalıştırarak profil puanınızı günceller.
-                    </Typography>
+                <DialogContent>
+                    <Box display="flex" flexDirection="column" alignItems="center" gap={3} py={2}>
+                        <Typography>Bu çalışma ortamından ne kadar memnun kaldın?</Typography>
+
+                        {/* Yıldızlar */}
+                        <Rating
+                            name="simple-controlled"
+                            value={rating}
+                            onChange={(event, newValue) => setRating(newValue)}
+                            size="large"
+                            sx={{ fontSize: '3rem' }}
+                        />
+
+                        {/* Yorum Alanı */}
+                        <TextField
+                            autoFocus
+                            margin="dense"
+                            id="comment"
+                            label="Yorumunuz (İsteğe bağlı)"
+                            type="text"
+                            fullWidth
+                            multiline
+                            rows={3} // 3 satırlık alan
+                            variant="outlined"
+                            placeholder="Sessiz miydi? İnternet hızlı mıydı? Diğer öğrencilere ipucu ver..."
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                        />
+                    </Box>
                 </DialogContent>
-                <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
-                    <Button onClick={submitRating} variant="contained" sx={{ borderRadius: 50, px: 4 }}>
+                <DialogActions sx={{ p: 3, justifyContent: 'center' }}>
+                    <Button onClick={handleCloseModal} color="inherit">Vazgeç</Button>
+                    <Button
+                        onClick={handleSubmitReview}
+                        variant="contained"
+                        size="large"
+                        sx={{ px: 4, borderRadius: 2 }}
+                    >
                         Gönder
                     </Button>
                 </DialogActions>
             </Dialog>
-
         </Container>
     );
 };

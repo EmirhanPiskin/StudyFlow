@@ -9,9 +9,14 @@ import LogoutIcon from '@mui/icons-material/Logout';
 const Navbar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const [anchorEl, setAnchorEl] = React.useState(null);
+
+    const handleMenu = (event) => setAnchorEl(event.currentTarget);
+    const handleClose = () => setAnchorEl(null);
 
     const handleLogout = () => {
         logout();
+        handleClose();
         navigate('/login');
     };
 
@@ -74,54 +79,70 @@ const Navbar = () => {
                                 </Button>
                             )}
 
-                            {/* --- DÜZELTİLEN KISIM BAŞLANGIÇ --- */}
+                            {/* --- KULLANICI PROFİL ALANI --- */}
                             <Box sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#f1f5f9', p: 0.5, borderRadius: 50 }}>
 
-                                {/* İsim ve Avatar artık bir BUTON ve /profile adresine gidiyor */}
+                                {/* İsim ve Avatar BUTONU - DÜZELTİLEN KISIM BURASI */}
                                 <Button
-                                    component={Link}
-                                    to="/profile"
+                                    component={Link}   // <--- BU EKSİKTİ
+                                    to="/profile"      // <--- BU EKSİKTİ
                                     sx={{
                                         borderRadius: 50,
                                         textTransform: 'none',
                                         color: 'text.primary',
                                         px: 1,
                                         minWidth: 'auto',
-                                        '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' } // Üzerine gelince hafif kararsın
+                                        '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' }
                                     }}
                                 >
                                     <Avatar sx={{ width: 28, height: 28, bgcolor: 'secondary.main', fontSize: 14, mr: 1 }}>
-                                        {user.name.charAt(0)}
+                                        {user.name ? user.name.charAt(0) : 'U'}
                                     </Avatar>
                                     <Typography variant="body2" fontWeight="600">
                                         {user.name}
                                     </Typography>
                                 </Button>
 
-                                {/* Çıkış butonu ayrı duruyor */}
+                                {/* Çıkış butonu */}
                                 <IconButton size="small" onClick={handleLogout} color="error" sx={{ bgcolor: 'white', ml: 0.5 }}>
                                     <LogoutIcon fontSize="small" />
                                 </IconButton>
 
                             </Box>
-                            {/* --- DÜZELTİLEN KISIM BİTİŞ --- */}
                         </>
                     ) : (
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <>
+                            {/* --- GİRİŞ YAPMAYANLAR İÇİN ALAN (BURASI GÜNCELLENDİ) --- */}
+
+                            {/* 1. Giriş Yap Butonu */}
                             <Button
                                 component={Link}
                                 to="/login"
-                                variant="contained"
-                                sx={{
-                                    borderRadius: 50,
-                                    px: 3,
-                                    background: 'linear-gradient(45deg, #4f46e5 30%, #6366f1 90%)',
-                                    boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)'
-                                }}
+                                color="inherit"
+                                sx={{ fontWeight: 600, mr: 1 }}
                             >
                                 Giriş Yap
                             </Button>
-                        </motion.div>
+
+                            {/* 2. Kayıt Ol Butonu (YENİ EKLENDİ) */}
+                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                <Button
+                                    component={Link}
+                                    to="/register"
+                                    variant="contained"
+                                    sx={{
+                                        borderRadius: 50,
+                                        px: 3,
+                                        background: 'linear-gradient(45deg, #4f46e5 30%, #6366f1 90%)',
+                                        boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)',
+                                        textTransform: 'none',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    Kayıt Ol
+                                </Button>
+                            </motion.div>
+                        </>
                     )}
                 </Box>
 

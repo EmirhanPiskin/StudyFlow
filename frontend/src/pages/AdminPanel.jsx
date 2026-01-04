@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Container, Typography, Box, Tabs, Tab, Paper,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Button, IconButton, Chip, Grid, Avatar
+    Button, IconButton, Chip, Grid, Avatar, Rating,
+    Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, ListItemAvatar
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // İkonlar
-import DeleteIcon from '@mui/icons-material/DeleteOutline'; // Daha ince ikon
+import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import AddCircleIcon from '@mui/icons-material/AddCircleOutline';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
@@ -16,13 +17,14 @@ import EventSeatIcon from '@mui/icons-material/EventSeat';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
-import ScienceIcon from '@mui/icons-material/Science'; // Analiz için
+import ScienceIcon from '@mui/icons-material/Science';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import CommentIcon from '@mui/icons-material/Comment'; // Yorum ikonu
 
-// Bileşenler ve Veri
 import AddSpotModal from '../components/AddSpotModal';
-import { mockStudySpots } from '../services/mockData';
+import { Service } from '../services/api';
 
-// --- (StatCard Bileşenini buraya veya yukarıya yapıştırdığını varsayıyorum) ---
+// İstatistik Kartı
 const StatCard = ({ title, value, icon, color, delay }) => (
     <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -33,16 +35,9 @@ const StatCard = ({ title, value, icon, color, delay }) => (
         <Paper
             elevation={0}
             sx={{
-                p: 3,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 background: `linear-gradient(135deg, ${color[0]}, ${color[1]})`,
-                color: 'white',
-                borderRadius: 4,
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                overflow: 'hidden',
-                position: 'relative'
+                color: 'white', borderRadius: 4, position: 'relative', overflow: 'hidden'
             }}
         >
             <Box sx={{ position: 'absolute', right: -20, bottom: -20, opacity: 0.2, transform: 'rotate(-20deg)' }}>
@@ -52,238 +47,338 @@ const StatCard = ({ title, value, icon, color, delay }) => (
                 <Typography variant="h3" fontWeight="bold">{value}</Typography>
                 <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>{title}</Typography>
             </Box>
-            <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '50%' }}>
-                {icon}
-            </Box>
+            <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '50%' }}>{icon}</Box>
         </Paper>
     </motion.div>
 );
 
 const AdminPanel = () => {
     const [tabIndex, setTabIndex] = useState(0);
-    const [spots, setSpots] = useState(mockStudySpots);
+
+    // Veri State'leri
+    const [stats, setStats] = useState({ active_reservations: 0, available_spots: 0, average_site_rating: 0, total_students: 0 });
+    const [spots, setSpots] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [reservations, setReservations] = useState([]);
+
+    // Modal State'leri
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    const handleTabChange = (event, newValue) => setTabIndex(newValue);
+    // Analiz State'leri
+    const [analysisResult, setAnalysisResult] = useState(null);
+    const [analysisTitle, setAnalysisTitle] = useState("");
 
-    const handleDelete = (id) => {
-        if (window.confirm("Bu alanı silmek istediğinize emin misiniz?")) {
-            setSpots(spots.filter(s => s.id !== id));
+    // --- YENİ: Yorum Yönetimi State'leri ---
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [currentSpotReviews, setCurrentSpotReviews] = useState([]);
+    const [currentSpotName, setCurrentSpotName] = useState("");
+    const [currentSpotId, setCurrentSpotId] = useState(null); // Silme sonrası yenilemek için
+
+    useEffect(() => {
+        loadAllData();
+    }, []);
+
+    const loadAllData = async () => {
+        try {
+            const sData = await Service.getAdminStats();
+            setStats(sData);
+
+            const spotsData = await Service.getSpots();
+            setSpots(spotsData); // Artık içinde average_rating var
+
+            const uData = await Service.getAllUsers();
+            setUsers(uData);
+
+            const rData = await Service.getAllReservations();
+            setReservations(rData);
+        } catch (error) {
+            console.error("Veri yükleme hatası", error);
         }
     };
 
-    const handleAddSpot = (newSpotData) => {
-        const newId = spots.length > 0 ? Math.max(...spots.map(s => s.id)) + 1 : 1;
-        setSpots([...spots, { ...newSpotData, id: newId }]);
+    // --- ACTIONS ---
+
+    // 1. Mekan Sil
+    const handleSpotDelete = async (id) => {
+        if (confirm("Mekanı silmek istediğinize emin misiniz?")) {
+            await Service.deleteSpot(id);
+            loadAllData();
+        }
+    };
+
+    // 2. Mekan Ekle
+    const handleAddSpot = async (data) => {
+        await Service.addSpot(data);
+        alert("Mekan eklendi.");
+        loadAllData();
+    };
+
+    // 3. Analiz Yap (Güvenli Mapping ile)
+    const handleAnalysis = async (type, title) => {
+        try {
+            const result = await Service.getAnalysis(type);
+            setAnalysisTitle(title);
+            setAnalysisResult(result);
+        } catch (e) {
+            alert("Hata: " + e);
+        }
+    };
+
+    // --- YENİ: Yorumları Görüntüle ---
+    const handleOpenReviews = async (spot) => {
+        try {
+            setCurrentSpotName(spot.name);
+            setCurrentSpotId(spot.id);
+            const reviews = await Service.getSpotReviews(spot.id);
+            setCurrentSpotReviews(reviews);
+            setReviewModalOpen(true);
+        } catch (error) {
+            alert("Yorumlar yüklenemedi.");
+        }
+    };
+
+    // --- YENİ: Yorum Sil ---
+    const handleReviewDelete = async (reviewId) => {
+        if (confirm("Bu yorumu kalıcı olarak silmek istediğinize emin misiniz?")) {
+            try {
+                await Service.deleteReview(reviewId);
+                // Listeden anlık sil (Pencereyi kapatmaya gerek yok)
+                setCurrentSpotReviews(currentSpotReviews.filter(r => r.id !== reviewId));
+                // Ana tabloyu da güncelle (Ortalama puan değişebilir)
+                loadAllData();
+            } catch (error) {
+                alert("Silme hatası oluştu.");
+            }
+        }
     };
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-
-            {/* BAŞLIK ALANI */}
+        <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
             <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
                 <Box>
-                    <Typography variant="h4" fontWeight="900" sx={{ color: '#1e293b' }}>
-                        Yönetim Paneli
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Sistem istatistikleri ve mekan yönetimi
-                    </Typography>
+                    <Typography variant="h4" fontWeight="900" sx={{ color: '#1e293b' }}>Yönetim Paneli</Typography>
+                    <Typography variant="body2" color="text.secondary">Tüm sistem kontrolü tek ekranda.</Typography>
                 </Box>
-                {/* Kullanıcıya ufak bir tarih göstergesi */}
-                <Chip label={new Date().toLocaleDateString('tr-TR')} variant="outlined" />
+                <Chip label="Admin Yetkisi Aktif" color="error" variant="outlined" />
             </Box>
 
-            {/* MODERN SEKMELER */}
-            <Paper
-                elevation={0}
-                sx={{
-                    borderRadius: 4,
-                    mb: 4,
-                    bgcolor: 'white',
-                    border: '1px solid #e2e8f0',
-                    p: 0.5
-                }}
-            >
+            {/* SEKMELER - Yorumlar Sekmesi Kaldırıldı */}
+            <Paper elevation={0} sx={{ borderRadius: 4, mb: 4, bgcolor: 'white', border: '1px solid #e2e8f0', p: 0.5 }}>
                 <Tabs
-                    value={tabIndex}
-                    onChange={handleTabChange}
-                    centered
-                    TabIndicatorProps={{ sx: { height: 0 } }} // Alt çizgiyi gizle
-                    sx={{
-                        '& .Mui-selected': {
-                            bgcolor: 'primary.main',
-                            color: 'white !important',
-                            borderRadius: 3
-                        },
-                        '& .MuiTab-root': {
-                            borderRadius: 3,
-                            transition: 'all 0.3s',
-                            mx: 1
-                        }
-                    }}
+                    value={tabIndex} onChange={(e, v) => setTabIndex(v)} centered
+                    sx={{ '& .Mui-selected': { bgcolor: '#1e293b', color: 'white !important', borderRadius: 3 } }}
                 >
-                    <Tab icon={<AssessmentIcon sx={{ mb: 0, mr: 1 }} />} iconPosition="start" label="Dashboard" />
-                    <Tab icon={<TableRestaurantIcon sx={{ mb: 0, mr: 1 }} />} iconPosition="start" label="Mekan Yönetimi" />
+                    <Tab icon={<AssessmentIcon sx={{ mr: 1 }} />} label="Dashboard & Analiz" />
+                    <Tab icon={<TableRestaurantIcon sx={{ mr: 1 }} />} label="Mekan Yönetimi" />
+                    <Tab icon={<PeopleIcon sx={{ mr: 1 }} />} label="Kullanıcılar" />
+                    <Tab icon={<PlaylistAddCheckIcon sx={{ mr: 1 }} />} label="Rezervasyonlar" />
                 </Tabs>
             </Paper>
 
-            {/* İÇERİK ALANI (AnimatePresence ile geçiş efekti) */}
             <AnimatePresence mode="wait">
 
-                {/* --- SEKME 1: DASHBOARD --- */}
+                {/* --- 1. DASHBOARD & ANALİZ --- */}
                 {tabIndex === 0 && (
-                    <motion.div
-                        key="dashboard"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ duration: 0.3 }}
-                    >
+                    <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                         <Grid container spacing={3}>
-                            <Grid item size={{ xs: 12, md: 4 }}>
-                                <StatCard
-                                    title="Aktif Rezervasyon"
-                                    value="12"
-                                    icon={<EventSeatIcon />}
-                                    color={['#6366f1', '#4f46e5']} // Indigo Gradient
-                                    delay={0.1}
-                                />
-                            </Grid>
-                            <Grid item size={{ xs: 12, md: 4 }}>
-                                <StatCard
-                                    title="Ortalama Puan"
-                                    value="4.8"
-                                    icon={<TrendingUpIcon />}
-                                    color={['#14b8a6', '#0d9488']} // Teal Gradient
-                                    delay={0.2}
-                                />
-                            </Grid>
-                            <Grid item size={{ xs: 12, md: 4 }}>
-                                <StatCard
-                                    title="Kayıtlı Öğrenci"
-                                    value="345"
-                                    icon={<PeopleIcon />}
-                                    color={['#f59e0b', '#d97706']} // Orange Gradient
-                                    delay={0.3}
-                                />
-                            </Grid>
+                            <Grid item size={{ xs: 12, md: 3 }}><StatCard title="Aktif Rezervasyon" value={stats.active_reservations} icon={<EventSeatIcon />} color={['#6366f1', '#4f46e5']} delay={0.1} /></Grid>
+                            <Grid item size={{ xs: 12, md: 3 }}><StatCard title="Mekan Ortalaması" value={stats.average_site_rating} icon={<TrendingUpIcon />} color={['#14b8a6', '#0d9488']} delay={0.2} /></Grid>
+                            <Grid item size={{ xs: 12, md: 3 }}><StatCard title="Toplam Öğrenci" value={stats.total_students} icon={<PeopleIcon />} color={['#f59e0b', '#d97706']} delay={0.3} /></Grid>
+                            <Grid item size={{ xs: 12, md: 3 }}><StatCard title="Aktif Mekan" value={stats.available_spots} icon={<TableRestaurantIcon />} color={['#ec4899', '#db2777']} delay={0.4} /></Grid>
 
-                            {/* ANALİZ BUTONLARI */}
-                            <Grid item size={{ xs: 12 }} sx={{ mt: 2 }}>
-                                <Paper sx={{ p: 4, borderRadius: 4, border: '1px dashed #cbd5e1' }} elevation={0}>
-                                    <Box display="flex" alignItems="center" gap={2} mb={2}>
-                                        <Avatar sx={{ bgcolor: 'secondary.light' }}><ScienceIcon /></Avatar>
-                                        <Typography variant="h6" fontWeight="bold">Özel Veritabanı Analizleri</Typography>
+                            <Grid item size={{ xs: 12 }}>
+                                <Paper sx={{ p: 4, borderRadius: 4, border: '1px dashed #cbd5e1', bgcolor: '#f8fafc' }} elevation={0}>
+                                    <Box display="flex" alignItems="center" gap={2} mb={3}>
+                                        <Avatar sx={{ bgcolor: '#334155' }}><ScienceIcon /></Avatar>
+                                        <Box>
+                                            <Typography variant="h6" fontWeight="bold">Veri Madenciliği & Analiz</Typography>
+                                            <Typography variant="caption" color="text.secondary">SQL Set Operasyonları</Typography>
+                                        </Box>
                                     </Box>
+
                                     <Grid container spacing={2}>
-                                        {['Tüm Salonları Kullananlar (UNION)', 'Sadık Öğrenciler (INTERSECT)', 'Pasif Kullanıcılar (EXCEPT)'].map((text, i) => (
-                                            <Grid item size={{ xs: 12, sm: 4 }} key={i}>
-                                                <Button
-                                                    fullWidth
-                                                    variant="outlined"
-                                                    sx={{
-                                                        justifyContent: 'flex-start',
-                                                        py: 1.5,
-                                                        borderRadius: 2,
-                                                        borderColor: '#cbd5e1',
-                                                        color: '#475569',
-                                                        '&:hover': { borderColor: 'primary.main', color: 'primary.main', bgcolor: '#f1f5f9' }
-                                                    }}
-                                                    onClick={() => alert("Sorgu veritabanına gönderildi.")}
-                                                >
-                                                    {text}
-                                                </Button>
-                                            </Grid>
-                                        ))}
+                                        <Grid item size={{ xs: 12, md: 4 }}><Button fullWidth variant="contained" sx={{ bgcolor: '#3b82f6' }} onClick={() => handleAnalysis('union', 'A1 veya A2 Kullananlar (UNION)')}>KAPSAM (UNION)</Button></Grid>
+                                        <Grid item size={{ xs: 12, md: 4 }}><Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6' }} onClick={() => handleAnalysis('intersect', 'Sadık Öğrenciler (INTERSECT)')}>KESİŞİM (INTERSECT)</Button></Grid>
+                                        <Grid item size={{ xs: 12, md: 4 }}><Button fullWidth variant="contained" sx={{ bgcolor: '#ef4444' }} onClick={() => handleAnalysis('except', 'Sadece A1 Kullananlar (EXCEPT)')}>FARK (EXCEPT)</Button></Grid>
                                     </Grid>
+
+                                    {analysisResult && (
+                                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}>
+                                            <Box mt={3} p={2} bgcolor="white" borderRadius={3} border="1px solid #e2e8f0">
+                                                <Typography variant="subtitle2" color="primary" fontWeight="bold" mb={1}>SONUÇ: {analysisTitle}</Typography>
+                                                {analysisResult.length > 0 ? (
+                                                    <Box display="flex" gap={1} flexWrap="wrap">
+                                                        {analysisResult.map((u, i) => (
+                                                            <Chip key={i} label={u.name || u} avatar={<Avatar>{(u.name || u).toString().charAt(0)}</Avatar>} />
+                                                        ))}
+                                                    </Box>
+                                                ) : <Typography variant="body2">Sonuç bulunamadı.</Typography>}
+                                            </Box>
+                                        </motion.div>
+                                    )}
                                 </Paper>
                             </Grid>
                         </Grid>
                     </motion.div>
                 )}
 
-                {/* --- SEKME 2: YÖNETİM --- */}
+                {/* --- 2. MEKAN YÖNETİMİ (YENİLENDİ: Yorumlar ve Puan Burada) --- */}
                 {tabIndex === 1 && (
-                    <motion.div
-                        key="management"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        <Box display="flex" justifyContent="flex-end" mb={3}>
-                            <Button
-                                variant="contained"
-                                startIcon={<AddCircleIcon />}
-                                onClick={() => setIsAddModalOpen(true)}
-                                sx={{
-                                    borderRadius: 3,
-                                    px: 3, py: 1,
-                                    background: 'linear-gradient(45deg, #4f46e5 30%, #6366f1 90%)',
-                                    boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.39)'
-                                }}
-                            >
-                                Yeni Alan Ekle
-                            </Button>
+                    <motion.div key="spots" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <Box display="flex" justifyContent="flex-end" mb={2}>
+                            <Button startIcon={<AddCircleIcon />} variant="contained" onClick={() => setIsAddModalOpen(true)}>Yeni Mekan</Button>
                         </Box>
-
-                        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 4 }}>
                             <Table>
                                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                     <TableRow>
-                                        {['ID', 'Alan Adı', 'Kapasite', 'Özellikler', 'Durum', 'İşlemler'].map((head) => (
-                                            <TableCell key={head} sx={{ fontWeight: 'bold', color: '#64748b' }}>{head}</TableCell>
-                                        ))}
+                                        <TableCell>ID</TableCell>
+                                        <TableCell>Ad</TableCell>
+                                        <TableCell>Kapasite</TableCell>
+                                        <TableCell>Ort. Puan</TableCell> {/* YENİ KOLON */}
+                                        <TableCell>Yorumlar</TableCell>  {/* YENİ KOLON */}
+                                        <TableCell>Durum</TableCell>
+                                        <TableCell>İşlem</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {spots.map((spot) => (
-                                        <TableRow key={spot.id} sx={{ '&:hover': { bgcolor: '#f1f5f9' }, transition: '0.2s' }}>
-                                            <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>#{spot.id}</TableCell>
-                                            <TableCell>{spot.name}</TableCell>
+                                    {spots.map(s => (
+                                        <TableRow key={s.id}>
+                                            <TableCell>#{s.id}</TableCell>
+                                            <TableCell fontWeight="bold">{s.name}</TableCell>
+                                            <TableCell>{s.capacity} Kişi</TableCell>
+
+                                            {/* PUAN GÖSTERİMİ */}
                                             <TableCell>
-                                                <Chip label={`${spot.capacity} Kişi`} size="small" sx={{ bgcolor: '#e0e7ff', color: '#4338ca', fontWeight: 'bold' }} />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Box display="flex" gap={0.5} flexWrap="wrap">
-                                                    {spot.features.slice(0, 2).map((f, i) => (
-                                                        <Chip key={i} label={f} size="small" variant="outlined" sx={{ fontSize: 10, height: 20 }} />
-                                                    ))}
-                                                    {spot.features.length > 2 && <Chip label={`+${spot.features.length - 2}`} size="small" sx={{ fontSize: 10, height: 20 }} />}
+                                                <Box display="flex" alignItems="center" gap={0.5}>
+                                                    <Rating value={s.average_rating || 0} readOnly size="small" precision={0.5} />
+                                                    <Typography variant="caption" fontWeight="bold">({s.average_rating})</Typography>
                                                 </Box>
                                             </TableCell>
+
+                                            {/* YORUM YÖNETİM BUTONU */}
                                             <TableCell>
-                                                <Box display="flex" alignItems="center" gap={1}>
-                                                    {spot.isAvailable ? <CheckCircleIcon color="success" fontSize="small" /> : <CancelIcon color="error" fontSize="small" />}
-                                                    <Typography variant="caption" fontWeight="bold" color={spot.isAvailable ? 'success.main' : 'error.main'}>
-                                                        {spot.isAvailable ? 'Aktif' : 'Dolu'}
-                                                    </Typography>
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell>
-                                                <IconButton
+                                                <Button
                                                     size="small"
-                                                    onClick={() => handleDelete(spot.id)}
-                                                    sx={{ color: '#ef4444', bgcolor: '#fee2e2', '&:hover': { bgcolor: '#fecaca' } }}
+                                                    variant="outlined"
+                                                    color="primary"
+                                                    startIcon={<CommentIcon />}
+                                                    onClick={() => handleOpenReviews(s)}
                                                 >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
+                                                    {s.total_reviews || 0} Yorum
+                                                </Button>
+                                            </TableCell>
+
+                                            <TableCell>{s.isAvailable ? <Chip label="Aktif" color="success" size="small" /> : <Chip label="Dolu" color="error" size="small" />}</TableCell>
+                                            <TableCell>
+                                                <IconButton size="small" color="error" onClick={() => handleSpotDelete(s.id)}><DeleteIcon /></IconButton>
                                             </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
                         </TableContainer>
-
-                        <AddSpotModal
-                            open={isAddModalOpen}
-                            handleClose={() => setIsAddModalOpen(false)}
-                            onAdd={handleAddSpot}
-                        />
+                        <AddSpotModal open={isAddModalOpen} handleClose={() => setIsAddModalOpen(false)} onAdd={handleAddSpot} />
                     </motion.div>
                 )}
+
+                {/* --- 3. KULLANICILAR --- */}
+                {tabIndex === 2 && (
+                    <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 4 }}>
+                            <Table>
+                                <TableHead sx={{ bgcolor: '#f8fafc' }}><TableRow><TableCell>Avatar</TableCell><TableCell>Ad Soyad</TableCell><TableCell>Email</TableCell><TableCell>Rol</TableCell><TableCell>Kayıt Tarihi</TableCell></TableRow></TableHead>
+                                <TableBody>
+                                    {users.map(u => (
+                                        <TableRow key={u.id}>
+                                            <TableCell><Avatar sx={{ width: 30, height: 30, fontSize: 14 }}>{u.name.charAt(0)}</Avatar></TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>{u.name}</TableCell>
+                                            <TableCell>{u.email}</TableCell>
+                                            <TableCell><Chip label={u.role} size="small" color={u.role === 'ADMIN' ? 'error' : 'primary'} variant="outlined" /></TableCell>
+                                            <TableCell>{u.joined_at}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </motion.div>
+                )}
+
+                {/* --- 4. REZERVASYONLAR --- */}
+                {tabIndex === 3 && (
+                    <motion.div key="res" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 4 }}>
+                            <Table>
+                                <TableHead sx={{ bgcolor: '#f8fafc' }}><TableRow><TableCell>ID</TableCell><TableCell>Öğrenci</TableCell><TableCell>Mekan</TableCell><TableCell>Tarih</TableCell><TableCell>Durum</TableCell></TableRow></TableHead>
+                                <TableBody>
+                                    {reservations.map(r => (
+                                        <TableRow key={r.id}>
+                                            <TableCell>#{r.id}</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>{r.user}</TableCell>
+                                            <TableCell>{r.spot}</TableCell>
+                                            <TableCell>{r.date} ({r.time})</TableCell>
+                                            <TableCell>
+                                                <Chip label={r.status} size="small" color={r.status === 'AKTİF' ? 'warning' : r.status === 'TAMAMLANDI' ? 'success' : 'default'} />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </motion.div>
+                )}
+
             </AnimatePresence>
+
+            {/* --- YORUM YÖNETİM MODALI --- */}
+            <Dialog open={reviewModalOpen} onClose={() => setReviewModalOpen(false)} fullWidth maxWidth="md">
+                <DialogTitle sx={{ fontWeight: 'bold', borderBottom: '1px solid #e2e8f0' }}>
+                    {currentSpotName} - Yorum Yönetimi
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    {currentSpotReviews.length > 0 ? (
+                        <List>
+                            {currentSpotReviews.map((rev) => (
+                                <Paper key={rev.id} variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
+                                    <ListItem
+                                        secondaryAction={
+                                            <Button
+                                                variant="outlined" color="error" size="small" startIcon={<DeleteIcon />}
+                                                onClick={() => handleReviewDelete(rev.id)}
+                                            >
+                                                Sil
+                                            </Button>
+                                        }
+                                    >
+                                        <ListItemAvatar>
+                                            <Avatar sx={{ bgcolor: '#e2e8f0', color: '#1e293b' }}>{rev.username.charAt(0)}</Avatar>
+                                        </ListItemAvatar>
+                                        <ListItemText
+                                            primary={
+                                                <Box display="flex" alignItems="center" gap={1}>
+                                                    <Typography fontWeight="bold">{rev.username}</Typography>
+                                                    <Rating value={rev.rating} size="small" readOnly />
+                                                    <Typography variant="caption" color="text.secondary">({rev.date})</Typography>
+                                                </Box>
+                                            }
+                                            secondary={rev.comment}
+                                        />
+                                    </ListItem>
+                                </Paper>
+                            ))}
+                        </List>
+                    ) : (
+                        <Box textAlign="center" py={5}>
+                            <CommentIcon sx={{ fontSize: 50, color: 'text.disabled', mb: 1 }} />
+                            <Typography color="text.secondary">Bu mekana ait henüz yorum yapılmamış.</Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setReviewModalOpen(false)}>Kapat</Button>
+                </DialogActions>
+            </Dialog>
+
         </Container>
     );
 };

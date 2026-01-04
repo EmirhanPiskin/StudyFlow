@@ -1,55 +1,44 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { Service } from '../services/api';
 
-// 1. Context'i oluştur (Boş bir havuz gibi düşün)
 const AuthContext = createContext();
 
-// 2. Sağlayıcı (Provider) Bileşeni
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null); // Başlangıçta kimse yok (null)
+    const [user, setUser] = useState(null);
 
-    // Giriş Yapma Fonksiyonu (Mock Logic)
-    const login = (email, password) => {
-        // Backend olmadığı için basit bir if-else ile rol atıyoruz
-        if (email.includes("admin")) {
-            setUser({
-                id: 1,
-                name: "Yönetici Bey",
-                email: email,
-                role: "ADMIN"
-            });
-        } else {
-            setUser({
-                id: 101,
-                name: "Öğrenci Ahmet",
-                email: email,
-                role: "STUDENT"
-            });
+    // 1. Sayfa açılınca LocalStorage'a bak, kullanıcı var mı?
+    useEffect(() => {
+        const storedUser = localStorage.getItem("studyflow_user");
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
         }
-        return true; // Giriş başarılı döndük
+    }, []);
+
+    const login = async (email, password) => {
+        try {
+            const userData = await Service.login(email, password);
+            setUser(userData);
+            // 2. Giriş yapınca tarayıcı hafızasına kaydet
+            localStorage.setItem("studyflow_user", JSON.stringify(userData));
+            return true;
+        } catch (error) {
+            console.error("Giriş Hatası:", error);
+            alert("Hatalı e-posta veya şifre!");
+            return false;
+        }
     };
 
-    // Çıkış Yapma Fonksiyonu
     const logout = () => {
         setUser(null);
+        // 3. Çıkış yapınca hafızadan sil
+        localStorage.removeItem("studyflow_user");
     };
 
-    // --- YENİ EKLENEN FONKSİYON: UPDATE İŞLEMİ ---
-    const updateProfile = (updatedData) => {
-        // Mevcut kullanıcı verisini, yeni gelenle birleştir (Merge)
-        setUser((prevUser) => ({
-            ...prevUser,
-            ...updatedData
-        }));
-        return true;
-    };
-
-    // Bu değerleri tüm uygulamaya açıyoruz
     return (
-        <AuthContext.Provider value={{ user, login, logout, updateProfile }}>
+        <AuthContext.Provider value={{ user, login, logout }}>
             {children}
         </AuthContext.Provider>
     );
 };
 
-// 3. Kullanımı kolaylaştıran bir kanca (Hook)
 export const useAuth = () => useContext(AuthContext);

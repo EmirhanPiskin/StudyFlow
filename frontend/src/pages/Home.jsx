@@ -1,59 +1,77 @@
-import React, { useState } from 'react';
-import { Container, Grid, Typography, Box, TextField, InputAdornment } from '@mui/material';
-import { Search, FilterList, Close } from '@mui/icons-material'; // <--- DÜZELTİLDİ
+import React, { useState, useEffect } from 'react';
+import { Container, Grid, Typography, Box, TextField, InputAdornment, Stack, Chip } from '@mui/material';
+import { Search, FilterList, Close, BookmarkAdded as BookmarkIcon } from '@mui/icons-material';
+import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import SpotCard from '../components/SpotCard';
 import ReservationModal from '../components/ReservationModal';
-import { mockStudySpots } from '../services/mockData';
-import { Stack, Chip } from '@mui/material'
-import { motion } from 'framer-motion';
+import { Service } from '../services/api';
 
-// Sistemde var olan tüm özellikleri buraya tanımlayalım (Filtre seçenekleri)
+// Filtre Seçenekleri
 const AVAILABLE_FEATURES = [
-    "Priz Var",
-    "Sessiz Alan",
-    "Klima",
-    "Projeksiyon",
-    "Beyaz Tahta",
-    "Wifi Zayıf",
-    "Açık Hava"
+    "Priz", "Sessiz", "Klima", "Projeksiyon", "Beyaz Tahta", "WiFi", "Açık Hava"
 ];
 
 const Home = () => {
+    const [spots, setSpots] = useState([]); // Ham veri
+    const [loading, setLoading] = useState(true);
     const [selectedSpot, setSelectedSpot] = useState(null);
-    const [searchTerm, setSearchTerm] = useState(""); // Arama metni
-    const [selectedFilters, setSelectedFilters] = useState([]); // Seçili filtreler
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedFilters, setSelectedFilters] = useState([]);
+    const navigate = useNavigate();
 
-    const handleOpenModal = (spot) => {
-        setSelectedSpot(spot);
+    useEffect(() => {
+        fetchSpots();
+    }, []);
+
+    // 1. Veri Çekme
+    const fetchSpots = async (query = "") => {
+        setLoading(true);
+        try {
+            // Backend'den isme göre filtrelenmiş veya tüm veriyi çeker
+            const data = await Service.getSpots(query);
+            setSpots(data);
+        } catch (error) {
+            console.error("Veri çekilemedi:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 2. Filtre Buton Mantığı
+    const handleFilterToggle = (feature) => {
+        if (selectedFilters.includes(feature)) {
+            setSelectedFilters(selectedFilters.filter(f => f !== feature));
+        } else {
+            setSelectedFilters([...selectedFilters, feature]);
+        }
+    };
+
+    // 3. Filtreleme Mantığı (Frontend Tarafında)
+    const filteredSpots = spots.filter((spot) => {
+        // Eğer hiç filtre seçili değilse hepsini göster
+        if (selectedFilters.length === 0) return true;
+
+        // Seçilen her filtre, mekanın özelliklerinde (features) var mı?
+        // Backend'den "Priz" gelebilir, filtrede "Priz Var" yazabilir. Partial match yapıyoruz:
+        return selectedFilters.every(filter =>
+            spot.features.some(f =>
+                // Örn: "Priz Var" kelimesi "Priz" içeriyor mu kontrolü veya tam tersi
+                f.toLowerCase().includes(filter.toLowerCase()) ||
+                filter.toLowerCase().includes(f.toLowerCase())
+            )
+        );
+    });
+
+    // 4. Modal Açma (Giriş Kontrolü ile)
+    const handleCardClick = (spot) => {
+        // Direkt detay sayfasına git
+        navigate(`/spot/${spot.id}`);
     };
 
     const handleCloseModal = () => {
         setSelectedSpot(null);
     };
-
-    // --- FİLTRELEME MANTIĞI (toggle) ---
-    const handleFilterToggle = (feature) => {
-        if (selectedFilters.includes(feature)) {
-            // Zaten seçiliyse çıkar
-            setSelectedFilters(selectedFilters.filter(f => f !== feature));
-        } else {
-            // Seçili değilse ekle
-            setSelectedFilters([...selectedFilters, feature]);
-        }
-    };
-
-    // --- LİSTEYİ SÜZME İŞLEMİ (HEM Arama HEM Filtre) ---
-    const filteredSpots = mockStudySpots.filter((spot) => {
-        // 1. İsim araması (Search Bar)
-        const matchesSearch = spot.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            spot.features.some(f => f.toLowerCase().includes(searchTerm.toLowerCase()));
-
-        // 2. Özellik Filtresi (Checkbox mantığı)
-        // Seçilen TÜM filtreler bu mekanda var mı? (AND mantığı)
-        const matchesFilters = selectedFilters.every(filter => spot.features.includes(filter));
-
-        return matchesSearch && matchesFilters;
-    });
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -63,13 +81,12 @@ const Home = () => {
                     textAlign: 'center',
                     py: 8,
                     mb: 6,
-                    background: 'linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%)', // Hafif mor gradient arka plan
+                    background: 'linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%)',
                     borderRadius: 4,
                     position: 'relative',
                     overflow: 'hidden'
                 }}
             >
-                {/* Arka plan süsleri (Blob effect) */}
                 <Box sx={{
                     position: 'absolute', top: -50, left: -50, width: 200, height: 200,
                     bgcolor: 'rgba(99, 102, 241, 0.2)', borderRadius: '50%', filter: 'blur(40px)'
@@ -84,9 +101,9 @@ const Home = () => {
                         variant="h2"
                         component="h1"
                         gutterBottom
-                        fontWeight="900" // Ekstra kalın
+                        fontWeight="900"
                         sx={{
-                            background: 'linear-gradient(45deg, #4f46e5 30%, #ec4899 90%)', // Yazı içi renk geçişi
+                            background: 'linear-gradient(45deg, #4f46e5 30%, #ec4899 90%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             letterSpacing: '-1px'
@@ -98,20 +115,23 @@ const Home = () => {
 
                 <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto', mb: 4 }}>
                     Kampüsün en sessiz köşeleri, en hızlı interneti ve en rahat koltukları seni bekliyor.
-                    Verimliliğini arttırmak için hemen yerini ayırt.
                 </Typography>
             </Box>
 
             {/* --- ARAMA VE FİLTRE ALANI --- */}
             <Box maxWidth="md" mx="auto" mb={4}>
-
-                {/* 1. Arama Çubuğu */}
+                {/* Arama Çubuğu - GÜNCELLENMİŞ VERSİYON */}
                 <TextField
                     fullWidth
-                    placeholder="Mekan ara..."
+                    placeholder="Mekan ara ve Enter'a bas..."
                     variant="outlined"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)} // Sadece state'i güncelle, istek atma
+                    onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                            fetchSpots(searchTerm); // İstek sadece Enter'a basınca gitsin
+                        }
+                    }}
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
@@ -122,7 +142,7 @@ const Home = () => {
                     sx={{ mb: 2 }}
                 />
 
-                {/* 2. Filtre Butonları (Chips) */}
+                {/* Filtre Butonları */}
                 <Box display="flex" alignItems="center" gap={1} mb={1}>
                     <FilterList color="action" fontSize="small" />
                     <Typography variant="body2" color="text.secondary">Özelliklere Göre Filtrele:</Typography>
@@ -136,7 +156,6 @@ const Home = () => {
                                 key={feature}
                                 label={feature}
                                 onClick={() => handleFilterToggle(feature)}
-                                // Seçiliyse dolu renk, değilse boş
                                 color={isSelected ? "primary" : "default"}
                                 variant={isSelected ? "filled" : "outlined"}
                                 onDelete={isSelected ? () => handleFilterToggle(feature) : undefined}
@@ -145,8 +164,6 @@ const Home = () => {
                             />
                         );
                     })}
-
-                    {/* Temizle Butonu (Sadece filtre seçiliyse görünür) */}
                     {selectedFilters.length > 0 && (
                         <Chip
                             label="Temizle"
@@ -157,23 +174,30 @@ const Home = () => {
                         />
                     )}
                 </Stack>
+
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                    *Bu arama veritabanı indexleri kullanılarak yapılmaktadır.
+                    *İsim araması veritabanı indexleri, özellikler ise JS filtresi kullanır.
                 </Typography>
             </Box>
 
-            {/* --- LİSTELEME (Artık 'filteredSpots' kullanıyoruz) --- */}
+            {/* --- LİSTELEME --- */}
             <Grid container spacing={4}>
+                {/* BURADAKİ MANTIK DÜZELTİLDİ: filteredSpots.length kontrol ediliyor */}
                 {filteredSpots.length > 0 ? (
                     filteredSpots.map((spot, index) => (
                         <Grid item key={spot.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                            <SpotCard spot={spot} index={index} onReserve={() => handleOpenModal(spot)} />
+                            <SpotCard
+                                spot={spot}
+                                index={index}
+                                onReserve={() => handleCardClick(spot)} // Artık sayfaya yönlendiriyor
+                            />
                         </Grid>
                     ))
                 ) : (
-                    // Hiç sonuç yoksa kullanıcıya bilgi verelim
+                    // Hiç sonuç yoksa (Filtre sonucu boşsa)
                     <Grid item size={{ xs: 12 }}>
                         <Box textAlign="center" py={5}>
+                            <BookmarkIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2, opacity: 0.5 }} />
                             <Typography variant="h6" color="text.secondary">
                                 Aradığınız kriterlere uygun mekan bulunamadı.
                             </Typography>
@@ -185,11 +209,6 @@ const Home = () => {
                 )}
             </Grid>
 
-            <ReservationModal
-                open={!!selectedSpot}
-                handleClose={handleCloseModal}
-                spot={selectedSpot}
-            />
         </Container>
     );
 };

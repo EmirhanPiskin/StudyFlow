@@ -47,6 +47,7 @@ CREATE TABLE reservations (
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
     status VARCHAR(20) CHECK (status IN ('AKTİF', 'İPTAL', 'TAMAMLANDI')) DEFAULT 'AKTİF',
+	has_reviewed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -71,7 +72,14 @@ CREATE OR REPLACE VIEW admin_dashboard_stats AS
 SELECT 
     (SELECT COUNT(*) FROM reservations WHERE status = 'AKTİF') as active_reservations,
     (SELECT COUNT(*) FROM study_spots WHERE is_available = TRUE) as available_spots,
-    (SELECT AVG(rating)::NUMERIC(10,2) FROM reviews) as average_site_rating,
+    (
+        SELECT COALESCE(AVG(sub.avg_rating), 0)::NUMERIC(10,2)
+        FROM (
+            SELECT AVG(rating) as avg_rating
+            FROM reviews
+            GROUP BY spot_id
+        ) sub
+    ) as average_site_rating,
     (SELECT COUNT(*) FROM users WHERE role = 'STUDENT') as total_students;
 
 -- 4. FONKSİYONLAR (STORED PROCEDURES)
@@ -182,17 +190,17 @@ INSERT INTO users (username, password, email, role) VALUES
 ('selin_nur', 'pass08', 'selin@univ.edu', 'STUDENT');
 
 -- STUDY_SPOTS (10 Kayıt)
-INSERT INTO study_spots (name, capacity, features, is_available) VALUES
-('Kütüphane A1', 4, 'Priz, Sessiz', TRUE),
-('Kütüphane A2', 4, 'Priz, Sessiz', TRUE),
-('Grup Odası 1', 6, 'Projeksiyon, Yazı Tahtası', TRUE),
-('Grup Odası 2', 6, 'TV, HDMI', FALSE),
-('Bilgisayar Lab 1', 1, 'i7 PC, Ethernet', TRUE),
-('Bilgisayar Lab 2', 1, 'i7 PC, Ethernet', TRUE),
-('Teras Çalışma', 10, 'Açık Hava, WiFi', TRUE),
-('Sessiz Kabin 1', 1, 'Ses Yalıtımı', TRUE),
-('Sessiz Kabin 2', 1, 'Ses Yalıtımı', TRUE),
-('Kafe Masası', 2, 'Priz, Kahve Yakın', TRUE);
+INSERT INTO study_spots (name, capacity, features, is_available, image_url) VALUES
+('Kütüphane A1', 4, 'Priz, Sessiz', TRUE, 'https://images.unsplash.com/photo-1497366216548-37526070297c'),
+('Kütüphane A2', 4, 'Priz, Sessiz', TRUE, 'https://images.unsplash.com/photo-1568605114967-8130f3a36994'),
+('Grup Odası 1', 6, 'Projeksiyon, Yazı Tahtası', TRUE, 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4'),
+('Bilgisayar Lab 1', 1, 'i7 PC, Ethernet', TRUE, 'https://images.unsplash.com/photo-1593642702821-c8da6771f0c6'),
+('Teras Çalışma', 10, 'Açık Hava, WiFi', TRUE, 'https://images.unsplash.com/photo-1564507592333-c60657eea523'),
+('Sessiz Kabin 1', 1, 'Ses Yalıtımı', TRUE, 'https://images.unsplash.com/photo-1519389950473-47ba0277781c'),
+('Sessiz Kabin 2', 1, 'Ses Yalıtımı', TRUE, 'https://images.unsplash.com/photo-1519389950473-47ba0277781c'),
+('Bilgisayar Lab 2', 1, 'i7 PC, Ethernet', TRUE, 'https://images.unsplash.com/photo-1593642702821-c8da6771f0c6'),
+('Grup Odası 2', 6, 'TV, HDMI', FALSE, 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4'),
+('Kafe Masası', 2, 'Priz, Kahve Yakın', TRUE, 'https://images.unsplash.com/photo-1554118811-1e0d58224f24');
 
 -- RESERVATIONS (10 Kayıt)
 INSERT INTO reservations (user_id, spot_id, start_time, end_time, status) VALUES
