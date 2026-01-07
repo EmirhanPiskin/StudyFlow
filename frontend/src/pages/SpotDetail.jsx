@@ -33,9 +33,9 @@ const SpotDetail = () => {
     const [selectedDate, setSelectedDate] = useState("");
     const [startHour, setStartHour] = useState("");
     const [endHour, setEndHour] = useState("");
-
+    const [occupiedSeats, setOccupiedSeats] = useState([]);
     const availableHours = generateHours();
-
+    const today = new Date().toISOString().split('T')[0]; // "2024-01-07" formatını verir
     useEffect(() => {
         const loadData = async () => {
             const allSpots = await Service.getSpots();
@@ -48,19 +48,35 @@ const SpotDetail = () => {
         loadData();
     }, [id]);
 
+    useEffect(() => {
+        const checkAvailability = async () => {
+            if (selectedDate && startHour && endHour) {
+                try {
+                    // startHour "14:00" gibi gelmeli. Eğer dropdown sadece "14" dönüyorsa formatla.
+                    // Bizim kodda "14:00" formatında olduğu için direkt gönderiyoruz.
+                    const occupied = await Service.getOccupiedSeats(id, selectedDate, startHour, endHour);
+                    setOccupiedSeats(occupied);
+
+                    // Eğer seçili koltuk artık doluysa, seçimi kaldır
+                    if (selectedSeat && occupied.includes(selectedSeat)) {
+                        setSelectedSeat(null);
+                        alert("Seçtiğiniz saat aralığında bu koltuk maalesef dolu.");
+                    }
+                } catch (error) {
+                    console.error("Dolu koltuklar çekilemedi", error);
+                }
+            }
+        };
+        checkAvailability();
+    }, [selectedDate, startHour, endHour, id]);
+
     const handleReserve = async () => {
         if (!user) return alert("Lütfen giriş yapın.");
         if (!selectedSeat) return alert("Lütfen oturmak istediğiniz koltuğu seçin!");
         if (!selectedDate || !startHour || !endHour) return alert("Lütfen tarih ve saat aralığını seçiniz.");
-
-        // Saat Kontrolü (Bitiş, Başlangıçtan sonra olmalı)
-        if (parseInt(startHour) >= parseInt(endHour)) {
-            return alert("Bitiş saati, başlangıç saatinden sonra olmalıdır.");
-        }
+        if (parseInt(startHour) >= parseInt(endHour)) return alert("Saat hatası.");
 
         try {
-            // Tarih ve Saati Backend formatına (ISO 8601) çeviriyoruz
-            // Örn: "2023-12-01" + "T" + "14:00" -> "2023-12-01T14:00:00"
             const finalStart = `${selectedDate}T${startHour}:00`;
             const finalEnd = `${selectedDate}T${endHour}:00`;
 
@@ -68,13 +84,14 @@ const SpotDetail = () => {
                 userId: user.id,
                 spotId: parseInt(id),
                 start: finalStart,
-                end: finalEnd
+                end: finalEnd,
+                seatNumber: selectedSeat // <--- ARTIK KOLTUK NO GÖNDERİYORUZ
             });
 
-            alert("Rezervasyon Başarılı! İyi çalışmalar.");
+            alert("Rezervasyon Başarılı!");
             navigate('/my-reservations');
         } catch (error) {
-            alert("Hata: " + (error.response?.data?.detail || "İşlem başarısız (Çakışma olabilir)"));
+            alert("Hata: " + (error.response?.data?.detail || "İşlem başarısız"));
         }
     };
 
@@ -146,26 +163,33 @@ const SpotDetail = () => {
 
                             {/* SANDALYELER */}
                             {Array.from({ length: spot.capacity }).map((_, index) => {
+                                const seatNum = index + 1;
+                                const isOccupied = occupiedSeats.includes(seatNum); // Dolu mu?
+                                const isSelected = selectedSeat === seatNum;
+
+                                // Koordinat hesapları aynı...
                                 const angle = (index / spot.capacity) * 2 * Math.PI;
                                 const radius = 90;
                                 const x = Math.cos(angle) * radius;
                                 const y = Math.sin(angle) * radius;
-                                const isSelected = selectedSeat === index + 1;
 
                                 return (
                                     <Box
                                         key={index}
-                                        onClick={() => setSelectedSeat(index + 1)}
+                                        onClick={() => !isOccupied && setSelectedSeat(seatNum)} // Doluysa tıklanmasın
                                         sx={{
                                             position: 'absolute',
                                             transform: `translate(${x}px, ${y}px)`,
-                                            cursor: 'pointer', textAlign: 'center'
+                                            cursor: isOccupied ? 'not-allowed' : 'pointer', // İmleç değişsin
+                                            textAlign: 'center',
+                                            opacity: isOccupied ? 0.5 : 1 // Doluysa biraz silik dursun
                                         }}
                                     >
                                         <Avatar
                                             sx={{
-                                                bgcolor: isSelected ? '#16a34a' : '#fff',
-                                                color: isSelected ? '#fff' : '#64748b',
+                                                // Doluysa KIRMIZI, Seçiliyse YEŞİL, Boşsa BEYAZ
+                                                bgcolor: isOccupied ? '#ef4444' : (isSelected ? '#16a34a' : '#fff'),
+                                                color: isOccupied ? '#fff' : (isSelected ? '#fff' : '#64748b'),
                                                 border: isSelected ? 'none' : '2px solid #64748b',
                                                 width: 40, height: 40, transition: 'all 0.3s'
                                             }}
@@ -189,6 +213,7 @@ const SpotDetail = () => {
                                     fullWidth
                                     label="Tarih"
                                     InputLabelProps={{ shrink: true }}
+                                    inputProps={{ min: today }} // <--- İŞTE SİHİRLİ KOD BU!
                                     value={selectedDate}
                                     onChange={(e) => setSelectedDate(e.target.value)}
                                 />
@@ -227,16 +252,23 @@ const SpotDetail = () => {
                             </Grid>
                         </Grid>
 
-                        <Button
-                            variant="contained"
-                            fullWidth
-                            size="large"
-                            sx={{ mt: 3, borderRadius: 3, py: 1.5, bgcolor: '#1e293b' }}
-                            onClick={handleReserve}
-                            disabled={!selectedSeat}
-                        >
-                            {selectedSeat ? `${selectedSeat} Numaralı Koltuğu Ayırt` : "Lütfen Koltuk Seçin"}
-                        </Button>
+                        {spot.isAvailable ? (
+                            <Button
+                                variant="contained"
+                                fullWidth
+                                size="large"
+                                sx={{ mt: 3, borderRadius: 3, py: 1.5, bgcolor: '#1e293b' }}
+                                onClick={handleReserve}
+                                disabled={!selectedSeat}
+                            >
+                                {selectedSeat ? `${selectedSeat} Numaralı Koltuğu Ayırt` : "Lütfen Koltuk Seçin"}
+                            </Button>
+                        ) : (
+                            <Alert severity="warning" sx={{ mt: 3, borderRadius: 3 }}>
+                                <Typography fontWeight="bold">Bu mekan şu anda hizmet dışıdır.</Typography>
+                                Tadilat veya bakım çalışmaları nedeniyle rezervasyon yapılamamaktadır.
+                            </Alert>
+                        )}
                     </Paper>
                 </Grid>
 

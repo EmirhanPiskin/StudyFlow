@@ -3,7 +3,7 @@ import {
     Container, Typography, Box, Tabs, Tab, Paper,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Button, IconButton, Chip, Grid, Avatar, Rating,
-    Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, ListItemAvatar
+    Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText, ListItemAvatar, Alert
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -191,28 +191,74 @@ const AdminPanel = () => {
                                     <Box display="flex" alignItems="center" gap={2} mb={3}>
                                         <Avatar sx={{ bgcolor: '#334155' }}><ScienceIcon /></Avatar>
                                         <Box>
-                                            <Typography variant="h6" fontWeight="bold">Veri Madenciliği & Analiz</Typography>
-                                            <Typography variant="caption" color="text.secondary">SQL Set Operasyonları</Typography>
+                                            <Typography variant="h6" fontWeight="bold">Kullanıcı Davranış Analizi</Typography>
+                                            <Typography variant="caption" color="text.secondary">Sistemi aktif kullananlar ve atıl durumda olanlar</Typography>
                                         </Box>
                                     </Box>
 
                                     <Grid container spacing={2}>
-                                        <Grid item size={{ xs: 12, md: 4 }}><Button fullWidth variant="contained" sx={{ bgcolor: '#3b82f6' }} onClick={() => handleAnalysis('union', 'A1 veya A2 Kullananlar (UNION)')}>KAPSAM (UNION)</Button></Grid>
-                                        <Grid item size={{ xs: 12, md: 4 }}><Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6' }} onClick={() => handleAnalysis('intersect', 'Sadık Öğrenciler (INTERSECT)')}>KESİŞİM (INTERSECT)</Button></Grid>
-                                        <Grid item size={{ xs: 12, md: 4 }}><Button fullWidth variant="contained" sx={{ bgcolor: '#ef4444' }} onClick={() => handleAnalysis('except', 'Sadece A1 Kullananlar (EXCEPT)')}>FARK (EXCEPT)</Button></Grid>
+                                        {/* BUTON 1: GEZGİN GURMELER */}
+                                        <Grid item size={{ xs: 12, md: 6 }}>
+                                            <Button
+                                                fullWidth
+                                                variant="contained"
+                                                size="large"
+                                                sx={{
+                                                    bgcolor: '#8b5cf6',
+                                                    py: 2,
+                                                    '&:hover': { bgcolor: '#7c3aed' }
+                                                }}
+                                                onClick={() => handleAnalysis('loyal-users', 'Farklı Mekanları Deneyimleyen Sadık Kullanıcılar (Gezginler)')}
+                                            >
+                                                💎 GEZGİN KULLANICILAR (1 MEKAN)
+                                            </Button>
+                                        </Grid>
+
+                                        {/* BUTON 2: HAYALET KULLANICILAR */}
+                                        <Grid item size={{ xs: 12, md: 6 }}>
+                                            <Button
+                                                fullWidth
+                                                variant="contained"
+                                                size="large"
+                                                sx={{
+                                                    bgcolor: '#64748b',
+                                                    py: 2,
+                                                    '&:hover': { bgcolor: '#475569' }
+                                                }}
+                                                onClick={() => handleAnalysis('inactive-users', 'Kayıtlı Olup Hiç Rezervasyon Yapmayanlar (Hayaletler)')}
+                                            >
+                                                👻 AKTİF OLMAYAN KULLANICILAR
+                                            </Button>
+                                        </Grid>
                                     </Grid>
 
+                                    {/* Analiz Sonucu Gösterimi */}
                                     {analysisResult && (
                                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}>
-                                            <Box mt={3} p={2} bgcolor="white" borderRadius={3} border="1px solid #e2e8f0">
-                                                <Typography variant="subtitle2" color="primary" fontWeight="bold" mb={1}>SONUÇ: {analysisTitle}</Typography>
+                                            <Box mt={3} p={3} bgcolor="white" borderRadius={3} border="1px solid #e2e8f0" boxShadow="0 4px 6px -1px rgba(0, 0, 0, 0.1)">
+                                                <Typography variant="subtitle1" color="primary" fontWeight="bold" mb={2}>
+                                                    🔍 ANALİZ SONUCU:
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary" mb={2}>
+                                                    {analysisTitle}
+                                                </Typography>
+
                                                 {analysisResult.length > 0 ? (
                                                     <Box display="flex" gap={1} flexWrap="wrap">
                                                         {analysisResult.map((u, i) => (
-                                                            <Chip key={i} label={u.name || u} avatar={<Avatar>{(u.name || u).toString().charAt(0)}</Avatar>} />
+                                                            <Chip
+                                                                key={i}
+                                                                label={u.name || u}
+                                                                avatar={<Avatar sx={{ bgcolor: '#e2e8f0', color: '#1e293b' }}>{(u.name || u).toString().charAt(0)}</Avatar>}
+                                                                sx={{ fontWeight: 'bold' }}
+                                                            />
                                                         ))}
                                                     </Box>
-                                                ) : <Typography variant="body2">Sonuç bulunamadı.</Typography>}
+                                                ) : (
+                                                    <Alert severity="info" sx={{ bgcolor: '#f0f9ff' }}>
+                                                        Bu kritere uyan kullanıcı bulunamadı.
+                                                    </Alert>
+                                                )}
                                             </Box>
                                         </motion.div>
                                     )}
@@ -235,8 +281,8 @@ const AdminPanel = () => {
                                         <TableCell>ID</TableCell>
                                         <TableCell>Ad</TableCell>
                                         <TableCell>Kapasite</TableCell>
-                                        <TableCell>Ort. Puan</TableCell> {/* YENİ KOLON */}
-                                        <TableCell>Yorumlar</TableCell>  {/* YENİ KOLON */}
+                                        <TableCell>Ort. Puan</TableCell>
+                                        <TableCell>Yorumlar</TableCell>
                                         <TableCell>Durum</TableCell>
                                         <TableCell>İşlem</TableCell>
                                     </TableRow>
@@ -269,7 +315,7 @@ const AdminPanel = () => {
                                                 </Button>
                                             </TableCell>
 
-                                            <TableCell>{s.isAvailable ? <Chip label="Aktif" color="success" size="small" /> : <Chip label="Dolu" color="error" size="small" />}</TableCell>
+                                            <TableCell>{s.isAvailable ? <Chip label="Aktif" color="success" size="small" /> : <Chip label="Bakımda" color="error" size="small" />}</TableCell>
                                             <TableCell>
                                                 <IconButton size="small" color="error" onClick={() => handleSpotDelete(s.id)}><DeleteIcon /></IconButton>
                                             </TableCell>

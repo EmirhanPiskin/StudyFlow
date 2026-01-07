@@ -83,7 +83,7 @@ export const Service = {
 
     // Admin Analizleri
     getAnalysis: async (type) => {
-        // type: 'union', 'intersect', 'except'
+        // type: 'loyal-users' veya 'inactive-users' gelecek
         const response = await api.get(`/admin/analysis/${type}`);
         return response.data;
     },
@@ -118,6 +118,10 @@ export const Service = {
     },
     deleteReview: async (id) => {
         const response = await api.delete(`/admin/reviews/${id}`);
+        return response.data;
+    },
+    getOccupiedSeats: async (spotId, date, start, end) => {
+        const response = await api.get(`/spots/${spotId}/occupied?date=${date}&start=${start}&end=${end}`);
         return response.data;
     }
 };

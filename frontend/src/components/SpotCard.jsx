@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Card, CardMedia, CardContent, Typography, Box, Chip, Button, Rating } from '@mui/material';
-import { AccessTime, Group, Star } from '@mui/icons-material'; // Star ikonu eklendi
+import { AccessTime, Group, Star, Build } from '@mui/icons-material'; // Build ikonu eklendi (Tamir)
 import { motion } from 'framer-motion';
 
 const SpotCard = ({ spot, index, onReserve }) => {
@@ -19,10 +19,13 @@ const SpotCard = ({ spot, index, onReserve }) => {
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
+                    // Eğer bakımda ise opaklığı düşür
+                    opacity: spot.isAvailable ? 1 : 0.8,
+                    filter: spot.isAvailable ? 'none' : 'grayscale(100%)', // Bakımda ise siyah-beyaz yap
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+                        transform: spot.isAvailable ? 'translateY(-4px)' : 'none',
+                        boxShadow: spot.isAvailable ? '0 10px 20px rgba(0,0,0,0.1)' : 'none'
                     }
                 }}
             >
@@ -37,19 +40,22 @@ const SpotCard = ({ spot, index, onReserve }) => {
                         sx={{ objectFit: 'cover', bgcolor: '#f1f5f9' }}
                     />
 
-                    <Chip
-                        label={spot.isAvailable ? "Müsait" : "Dolu"}
-                        color={spot.isAvailable ? "success" : "error"}
-                        size="small"
-                        sx={{
-                            position: 'absolute', top: 10, right: 10,
-                            fontWeight: 'bold',
-                            backdropFilter: 'blur(4px)',
-                            backgroundColor: spot.isAvailable ? 'rgba(22, 163, 74, 0.9)' : 'rgba(220, 38, 38, 0.9)'
-                        }}
-                    />
+                    {/* BAKIMDA ETİKETİ */}
+                    {!spot.isAvailable && (
+                        <Chip
+                            icon={<Build fontSize="small" style={{ color: 'white' }} />}
+                            label="BAKIMDA"
+                            size="small"
+                            sx={{
+                                position: 'absolute', top: 10, right: 10,
+                                fontWeight: 'bold',
+                                bgcolor: 'rgba(0,0,0,0.8)', color: 'white',
+                                backdropFilter: 'blur(4px)'
+                            }}
+                        />
+                    )}
 
-                    {/* --- YENİ: Kartın Üzerinde Puan Göstergesi --- */}
+                    {/* Puan Göstergesi */}
                     <Box
                         sx={{
                             position: 'absolute', bottom: 10, left: 10,
@@ -78,6 +84,7 @@ const SpotCard = ({ spot, index, onReserve }) => {
                         </Typography>
                     </Box>
 
+                    {/* Özellikler */}
                     <Box display="flex" gap={0.5} mb={2} flexWrap="wrap">
                         {spot.features && spot.features.slice(0, 3).map((feature, i) => (
                             <Chip key={i} label={feature} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 24, bgcolor: '#f8fafc' }} />
@@ -90,14 +97,8 @@ const SpotCard = ({ spot, index, onReserve }) => {
                             <Typography variant="body2">{spot.capacity} Kişilik</Typography>
                         </Box>
 
-                        {/* Detaylı Yıldız Gösterimi */}
                         <Box display="flex" alignItems="center" gap={0.5}>
-                            <Rating
-                                value={spot.average_rating || 0}
-                                precision={0.5}
-                                size="small"
-                                readOnly
-                            />
+                            <Rating value={spot.average_rating || 0} precision={0.5} size="small" readOnly />
                         </Box>
                     </Box>
                 </CardContent>
@@ -106,17 +107,23 @@ const SpotCard = ({ spot, index, onReserve }) => {
                     <Button
                         variant="contained"
                         fullWidth
-                        onClick={onReserve}
-                        disabled={!spot.isAvailable}
+                        onClick={spot.isAvailable ? onReserve : undefined} // Bakımda ise tıklama çalışmaz
+                        disabled={!spot.isAvailable} // Görsel olarak disable olur
                         disableElevation
                         sx={{
                             borderRadius: 3,
                             textTransform: 'none',
                             fontWeight: 'bold',
-                            background: spot.isAvailable ? '#4f46e5' : '#94a3b8'
+                            background: '#1e293b',
+                            '&:hover': { background: '#0f172a' },
+                            // Disabled durumunda rengi ayarla
+                            '&.Mui-disabled': {
+                                background: '#e2e8f0',
+                                color: '#94a3b8'
+                            }
                         }}
                     >
-                        {spot.isAvailable ? "Rezervasyon Yap" : "Dolu"}
+                        {spot.isAvailable ? "Rezervasyon" : "Bu mekan şu an bakımda!"}
                     </Button>
                 </Box>
             </Card>
