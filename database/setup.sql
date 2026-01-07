@@ -125,18 +125,24 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Yardımcı Fonksiyon: Müsaitlik Kontrolü
-CREATE OR REPLACE FUNCTION check_availability(p_spot_id INT, p_start TIMESTAMP, p_end TIMESTAMP)
+CREATE OR REPLACE FUNCTION check_availability(p_spot_id INT, p_start TIMESTAMP, p_end TIMESTAMP, p_seat_number INT)
 RETURNS BOOLEAN AS $$
 DECLARE
     conflict_count INT;
 BEGIN
+    -- Aynı mekanda, AYNI KOLTUKTA ve çakışan saatte rezervasyon var mı?
     SELECT COUNT(*) INTO conflict_count
     FROM reservations
     WHERE spot_id = p_spot_id 
-      AND status = 'AKTİF'
+      AND seat_number = p_seat_number -- Koltuk kontrolü eklendi
+      AND status != 'İPTAL'
       AND (start_time, end_time) OVERLAPS (p_start, p_end);
       
-    IF conflict_count > 0 THEN RETURN FALSE; ELSE RETURN TRUE; END IF;
+    IF conflict_count > 0 THEN 
+        RETURN FALSE; -- Çakışma var, müsait değil
+    ELSE 
+        RETURN TRUE; -- Sorun yok, müsait
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
 

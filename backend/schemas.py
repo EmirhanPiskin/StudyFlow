@@ -1,4 +1,4 @@
-# schemas.py
+# backend/schemas.py
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -7,56 +7,57 @@ from typing import List, Optional
 class ReservationCreate(BaseModel):
     userId: int
     spotId: int
-    start: str  # Frontend "2023-12-01T14:00" formatında atıyor
+    start: str
     end: str
+    seatNumber: int
 
+# İŞTE DÜZELTME BURADA: Tek ve net bir SpotCreate tanımı.
+# features kesinlikle List[str] (Liste) olmalı.
 class SpotCreate(BaseModel):
     name: str
     capacity: int
-    features: List[str]
-    type: str
+    features: List[str]  # <--- Liste olarak geliyor ["Wifi", "Priz"]
+    type: str = "Library"
+    is_available: bool = True
+    image_url: Optional[str] = None
 
 class ReviewCreate(BaseModel):
     userId: int
     spotId: int
-    reservationId: int  # <--- YENİ EKLENDİ (Hangi rezervasyon için?)
+    reservationId: int
     rating: int
     comment: Optional[str] = None
 
-class UserUpdate(BaseModel):
-    name: str
-    password: Optional[str] = None
-# Login için model
 class UserLogin(BaseModel):
     email: str
     password: str
-# --- Giden Veri Modelleri (Backend -> Frontend) ---
-# Frontend'de "features" array bekliyoruz ama DB'de string tutmuştuk.
-# Bunu API'de çevireceğiz.
 
 class UserRegister(BaseModel):
     username: str
     email: str
     password: str
 
+# Kullanıcı güncelleme (Tek seferde tanımladık)
 class UserUpdate(BaseModel):
     userId: int
     username: str
-    password: Optional[str] = None # Şifre boş gelebilir
-    # SpotBase sınıfını bul ve bu satırı ekle:
+    password: Optional[str] = None
+
+# --- Giden Veri Modelleri (Backend -> Frontend) ---
+
+# Veritabanından okurken kullanılan temel model
 class SpotBase(BaseModel):
     name: str
     capacity: int
-    features: Optional[str] = None
+    # DB'den okurken features string gelir, ama biz API'de manuel çeviriyoruz.
+    # Pydantic hata vermesin diye Optional[str] bırakabiliriz veya Any yapabiliriz.
+    features: Optional[str] = None 
     is_available: bool = True
-    image_url: Optional[str] = None  # <--- EKLENECEK KRİTİK SATIR BU!
+    image_url: Optional[str] = None
 
-class SpotCreate(SpotBase):
-    pass
-
+# Spot detaylarını döndürürken kullanılan model
 class Spot(SpotBase):
     spot_id: int
-    # --- YENİ EKLENEN ALANLAR ---
     average_rating: Optional[float] = 0.0
     total_reviews: Optional[int] = 0
 

@@ -17,6 +17,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Süresi dolmuş rezervasyonları otomatik güncelleyen fonksiyon
+def check_and_update_statuses(db: Session):
+    # Bitiş saati geçmiş olan AKTİF rezervasyonları TAMAMLANDI yap
+    query = text("UPDATE reservations SET status = 'TAMAMLANDI' WHERE end_time < NOW() AND status = 'AKTİF'")
+    db.execute(query)
+    db.commit()
+
 # --- 1. LOGIN İŞLEMİ (DB'den Kontrol) ---
 @app.post("/api/login")
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
@@ -74,8 +81,6 @@ def get_spots(q: str = None, db: Session = Depends(get_db)):
             "features": row.features.split(", ") if row.features else [],
             "isAvailable": row.is_available,
             "image_url": optimized_img,
-            
-            # --- YENİ VERİLER ---
             "average_rating": float(row.avg_rating), # Decimal'i float yap
             "total_reviews": row.review_count
         })
@@ -85,20 +90,49 @@ def get_spots(q: str = None, db: Session = Depends(get_db)):
 @app.post("/api/reservations/create")
 def create_reservation(res: ReservationCreate, db: Session = Depends(get_db)):
     try:
-        query = text("""
-            INSERT INTO reservations (user_id, spot_id, start_time, end_time) 
-            VALUES (:uid, :sid, :start, :end)
+        # 1. ÇAKIŞMA KONTROLÜ (Sadece Seçilen Koltuk İçin)
+        # Mantık: Aynı mekanda, AYNI KOLTUKTA, tarih aralığı çakışan ve İPTAL edilmemiş rezervasyon var mı?
+        conflict_query = text("""
+            SELECT * FROM reservations 
+            WHERE spot_id = :sid 
+            AND seat_number = :seat
+            AND status != 'İPTAL'
+            AND (
+                (start_time < :end AND end_time > :start)
+            )
         """)
-        db.execute(query, {"uid": res.userId, "sid": res.spotId, "start": res.start, "end": res.end})
+        
+        conflict = db.execute(conflict_query, {
+            "sid": res.spotId, 
+            "seat": res.seatNumber, 
+            "start": res.start, 
+            "end": res.end
+        }).fetchone()
+
+        if conflict:
+            raise HTTPException(status_code=409, detail=f"{res.seatNumber} numaralı koltuk bu saatlerde dolu!")
+
+        # 2. REZERVASYONU KAYDET
+        insert_query = text("""
+            INSERT INTO reservations (user_id, spot_id, start_time, end_time, seat_number, status) 
+            VALUES (:uid, :sid, :start, :end, :seat, 'AKTİF')
+        """)
+        db.execute(insert_query, {
+            "uid": res.userId, 
+            "sid": res.spotId, 
+            "start": res.start, 
+            "end": res.end,
+            "seat": res.seatNumber
+        })
+        
         db.commit()
-        return {"message": "Başarılı"}
+        return {"message": "Rezervasyon başarılı!"}
+
+    except HTTPException as he:
+        raise he
     except Exception as e:
         db.rollback()
-        error_msg = str(e)
-        if "Trigger Hatası" in error_msg:
-            raise HTTPException(status_code=409, detail="Bu saat aralığı dolu!")
-        else:
-            raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- 4. ADMIN DASHBOARD STATS ---
 @app.get("/api/admin/stats")
@@ -123,27 +157,36 @@ def get_admin_stats(db: Session = Depends(get_db)):
 @app.post("/api/admin/add-spot")
 def add_spot(spot: SpotCreate, db: Session = Depends(get_db)):
     features_str = ", ".join(spot.features)
-    # Varsayılan bir resim atayalım ki boş kalmasın
-    default_img = "https://images.unsplash.com/photo-1497366216548-37526070297c"
+    
+    # KONTROL: Eğer kullanıcı resim (Base64) gönderdiyse onu al, yoksa varsayılanı koy.
+    final_image = spot.image_url 
+    if not final_image or len(final_image) < 10: # Boş veya çok kısaysa
+        final_image = "https://images.unsplash.com/photo-1497366216548-37526070297c"
     
     query = text("""
         INSERT INTO study_spots (name, capacity, features, is_available, image_url)
         VALUES (:name, :cap, :feat, true, :img)
     """)
-    db.execute(query, {"name": spot.name, "cap": spot.capacity, "feat": features_str, "img": default_img})
+    db.execute(query, {
+        "name": spot.name, 
+        "cap": spot.capacity, 
+        "feat": features_str, 
+        "img": final_image
+    })
     db.commit()
     return {"message": "Mekan eklendi"}
 
 # --- 6. ADMIN MEKAN SİLME ---
 @app.delete("/api/admin/delete-spot/{spot_id}")
 def delete_spot(spot_id: int, db: Session = Depends(get_db)):
-    query = text("DELETE FROM study_spots WHERE spot_id = :id")
-    db.execute(query, {"id": spot_id})
+    delete_query = text("DELETE FROM study_spots WHERE spot_id = :id")
+    db.execute(delete_query, {"id": spot_id})
     db.commit()
     return {"message": "Silindi"}
 
 @app.get("/api/my-history")
 def get_history(user_id: int, db: Session = Depends(get_db)):
+    check_and_update_statuses(db)
     # has_reviewed sütununu da çekiyoruz
     query = text("""
         SELECT r.reservation_id, s.name, r.start_time, r.end_time, r.status, s.image_url, s.spot_id, r.has_reviewed
@@ -231,43 +274,36 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
 # --- 9. ADMIN ANALİZLERİ (SET OPERATIONS) ---
 # Bu endpointler Admin panelindeki butonlara bağlanacak.
 
-@app.get("/api/admin/analysis/union")
-def get_union_analysis(db: Session = Depends(get_db)):
-    # UNION: Kütüphane A1 VEYA A2'yi kullananlar (İkisini de kapsar)
+@app.get("/api/admin/analysis/loyal-users")
+def get_loyal_users(db: Session = Depends(get_db)):
+    # SENARYO 1: "Gezgin Gurmeler"
+    # Birden fazla ( > 1 ) farklı mekana yorum yapmış kullanıcılar.
+    # Logic: Reviews tablosunda user_id'ye göre grupla, farklı spot_id sayısına bak.
     query = text("""
-        SELECT u.username FROM reservations r 
+        SELECT u.username 
+        FROM reviews r 
         JOIN users u ON r.user_id = u.user_id 
-        WHERE r.spot_id = 1 
-        UNION 
-        SELECT u.username FROM reservations r 
-        JOIN users u ON r.user_id = u.user_id 
-        WHERE r.spot_id = 2
+        GROUP BY u.username 
+        HAVING COUNT(DISTINCT r.spot_id) > 1
     """)
     result = db.execute(query).fetchall()
-    return [row.username for row in result]
+    
+    # Frontend'in beklediği format: [{"name": "Ahmet"}]
+    return [{"name": row.username} for row in result]
 
-@app.get("/api/admin/analysis/intersect")
-def get_intersect_analysis(db: Session = Depends(get_db)):
-    # INTERSECT: Hem Spot 1'i HEM Spot 2'yi kullananlar (Kesişim)
-    # (Bunu test etmek için DB'de aynı kişiye iki farklı mekana rezervasyon eklemelisin)
+@app.get("/api/admin/analysis/inactive-users")
+def get_inactive_users(db: Session = Depends(get_db)):
+    # SENARYO 2: "Hayalet Kullanıcılar"
+    # Sisteme kayıtlı (USERS) ama hiç rezervasyonu (RESERVATIONS) olmayanlar.
+    # Logic: (Tüm Kullanıcılar) FARK (Rezervasyon Yapanlar) -> EXCEPT Kullanımı
     query = text("""
-        SELECT user_id FROM reservations WHERE spot_id = 1 
-        INTERSECT 
-        SELECT user_id FROM reservations WHERE spot_id = 2
-    """)
-    result = db.execute(query).fetchall()
-    return [f"User ID: {row.user_id}" for row in result]
-
-@app.get("/api/admin/analysis/except")
-def get_except_analysis(db: Session = Depends(get_db)):
-    # EXCEPT: Spot 1'i kullanmış ama Spot 2'yi HİÇ kullanmamışlar (Fark)
-    query = text("""
-        SELECT user_id FROM reservations WHERE spot_id = 1 
+        SELECT username FROM users WHERE role = 'STUDENT'
         EXCEPT 
-        SELECT user_id FROM reservations WHERE spot_id = 2
+        SELECT u.username FROM reservations r JOIN users u ON r.user_id = u.user_id
     """)
     result = db.execute(query).fetchall()
-    return [f"User ID: {row.user_id}" for row in result]
+    
+    return [{"name": row.username} for row in result]
 # --- 10. PROFİL GÜNCELLEME ---
 @app.put("/api/profile/update")
 def update_profile(data: UserUpdate, db: Session = Depends(get_db)):
@@ -352,6 +388,7 @@ def get_all_users(db: Session = Depends(get_db)):
 # --- 14. ADMIN: TÜM REZERVASYONLARI GETİR ---
 @app.get("/api/admin/reservations")
 def get_all_reservations(db: Session = Depends(get_db)):
+    check_and_update_statuses(db)
     query = text("""
         SELECT r.reservation_id, u.username, s.name as spot_name, r.start_time, r.end_time, r.status
         FROM reservations r
@@ -434,3 +471,24 @@ def get_except_analysis(db: Session = Depends(get_db)):
     """)
     result = db.execute(query).fetchall()
     return [{"name": row.username} for row in result]
+
+    # --- 17. DOLU KOLTUKLARI GETİR ---
+@app.get("/api/spots/{spot_id}/occupied")
+def get_occupied_seats(spot_id: int, date: str, start: str, end: str, db: Session = Depends(get_db)):
+    # Belirtilen tarih ve saat aralığında o mekandaki dolu koltuk numaralarını döndürür.
+    # Frontend'den gelen format: date="2023-12-01", start="14:00", end="15:00"
+    check_and_update_statuses(db)
+    start_dt = f"{date} {start}:00"
+    end_dt = f"{date} {end}:00"
+    
+    query = text("""
+        SELECT seat_number FROM reservations 
+        WHERE spot_id = :sid 
+        AND status != 'İPTAL'
+        AND (start_time < :end_dt AND end_time > :start_dt)
+    """)
+    
+    result = db.execute(query, {"sid": spot_id, "start_dt": start_dt, "end_dt": end_dt}).fetchall()
+    
+    # Dolu koltukların listesini döndür [1, 3, 5] gibi
+    return [row.seat_number for row in result]
