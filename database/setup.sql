@@ -20,7 +20,6 @@ CREATE TABLE users (
     password VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     role VARCHAR(20) CHECK (role IN ('ADMIN', 'STUDENT')), 
-    efficiency_score INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -164,21 +163,27 @@ BEFORE INSERT ON reservations
 FOR EACH ROW
 EXECUTE FUNCTION prevent_overlap();
 
--- TRIGGER 2 (Puanlama Sonrası Skor Artışı - After Insert)
-CREATE OR REPLACE FUNCTION update_user_score()
+-- TRIGGER 2 (Mekan Bakıma Alındığında - Otomatik Rezervasyonları İptal Et)
+-- Mantık: is_available FALSE'a çekildiğinde o mekanın tüm AKTİF rezervasyonlarını İPTAL'e çek
+CREATE OR REPLACE FUNCTION auto_cancel_on_maintenance()
 RETURNS TRIGGER AS $$
 BEGIN
-    UPDATE users
-    SET efficiency_score = efficiency_score + 10
-    WHERE user_id = NEW.user_id;
+    -- Eğer mekan aktiften (TRUE) pasife (FALSE) değiştiriliyorsa
+    IF OLD.is_available = TRUE AND NEW.is_available = FALSE THEN
+        -- O mekanın tüm AKTİF rezervasyonlarını İPTAL et
+        UPDATE reservations
+        SET status = 'İPTAL'
+        WHERE spot_id = NEW.spot_id
+        AND status = 'AKTİF';
+    END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_add_score
-AFTER INSERT ON reviews
+CREATE TRIGGER trg_auto_cancel_maintenance
+BEFORE UPDATE ON study_spots
 FOR EACH ROW
-EXECUTE FUNCTION update_user_score();
+EXECUTE FUNCTION auto_cancel_on_maintenance();
 
 -- 6. VERİ DOLDURMA (SEED DATA - Her tabloya 10 Kayıt)
 
