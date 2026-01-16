@@ -132,6 +132,13 @@ def create_reservation(res: ReservationCreate, db: Session = Depends(get_db)):
         raise he
     except Exception as e:
         db.rollback()
+        # TRIGGER HATASI KONTROL (trg_check_overlap)
+        if "Bu saat aralığında bu mekan dolu" in str(e) or "Trigger Hatası" in str(e):
+            raise HTTPException(
+                status_code=409, 
+                detail=f"⚠️ TRIGGER UYARISI: Bu koltuk bu saatlerde dolu! Lütfen başka koltuk seçin.",
+                headers={"X-Trigger-Name": "trg_check_overlap"}
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- 4. ADMIN DASHBOARD STATS ---
@@ -183,6 +190,62 @@ def delete_spot(spot_id: int, db: Session = Depends(get_db)):
     db.execute(delete_query, {"id": spot_id})
     db.commit()
     return {"message": "Silindi"}
+
+# --- 6B. ADMIN MEKAN BAKIMA ALMA (TRIGGER: trg_auto_cancel_maintenance) ---
+@app.put("/api/admin/spot/{spot_id}/maintenance")
+def set_spot_maintenance(spot_id: int, is_maintenance: bool, db: Session = Depends(get_db)):
+    """
+    Mekanı bakıma almak/çıkarmak (TRIGGER tetiklenir)
+    
+    TRIGGER: trg_auto_cancel_maintenance
+    - is_available TRUE → FALSE: Tüm AKTİF rezervasyonlar otomatik İPTAL'e çekilir
+    - Frontend'e bilgilendirme mesajı döndürülür
+    """
+    try:
+        # Mekanın şu anki durumunu al
+        check_query = text("SELECT name, is_available FROM study_spots WHERE spot_id = :id")
+        spot = db.execute(check_query, {"id": spot_id}).fetchone()
+        
+        if not spot:
+            raise HTTPException(status_code=404, detail="Mekan bulunamadı.")
+        
+        # Mekan durumunu güncelle (TRIGGER otomatik çalışacak)
+        update_query = text("UPDATE study_spots SET is_available = :available WHERE spot_id = :id")
+        db.execute(update_query, {"available": is_maintenance is False, "id": spot_id})
+        
+        # Eğer bakıma alındıysa (is_maintenance = True), iptal edilen rezervasyonları say
+        if is_maintenance and spot.is_available:
+            # Trigger çalıştı, bu mekanın kaç AKTİF rezervasyonu iptal edildi?
+            count_query = text("""
+                SELECT COUNT(*) FROM reservations 
+                WHERE spot_id = :id AND status = 'İPTAL'
+            """)
+            cancelled_count = db.execute(count_query, {"id": spot_id}).scalar()
+            
+            db.commit()
+            
+            return {
+                "message": f"✅ TRIGGER BAŞARILI: '{spot.name}' bakıma alındı!",
+                "trigger_name": "trg_auto_cancel_maintenance",
+                "action": "maintenance_activated",
+                "spot_name": spot.name,
+                "cancelled_reservations": cancelled_count,
+                "details": f"{cancelled_count} adet AKTİF rezervasyon otomatik olarak iptal edildi."
+            }
+        else:
+            db.commit()
+            return {
+                "message": f"✅ '{spot.name}' bakımdan çıkarıldı!",
+                "trigger_name": "trg_auto_cancel_maintenance",
+                "action": "maintenance_deactivated",
+                "spot_name": spot.name
+            }
+    
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Hata: {str(e)}")
 
 @app.get("/api/my-history")
 def get_history(user_id: int, db: Session = Depends(get_db)):
@@ -492,3 +555,101 @@ def get_occupied_seats(spot_id: int, date: str, start: str, end: str, db: Sessio
     
     # Dolu koltukların listesini döndür [1, 3, 5] gibi
     return [row.seat_number for row in result]
+
+# --- 18. SQL FONKSİYONLARI KULLANAN ENDPOINT'LER ---
+
+# FONKSIYON 1: get_spot_history (CURSOR ve RECORD ile)
+@app.get("/api/spots/{spot_id}/history")
+def get_spot_history_endpoint(spot_id: int, db: Session = Depends(get_db)):
+    """
+    Bir mekanın tüm geçmiş rezervasyonlarını CURSOR ve RECORD kullanan SQL fonksiyonu ile döndürür.
+    Fonksiyon adı: get_spot_history(p_spot_id INT)
+    """
+    try:
+        query = text("SELECT * FROM get_spot_history(:spot_id)")
+        result = db.execute(query, {"spot_id": spot_id}).fetchall()
+        
+        history = []
+        for row in result:
+            history.append({
+                "username": row.r_user,
+                "start_time": row.r_start.strftime("%d.%m.%Y %H:%M") if row.r_start else None,
+                "status": row.r_status
+            })
+        return history
+    except Exception as e:
+        print(f"Hata: {e}")
+        return {"error": str(e)}
+
+# FONKSIYON 2: calculate_study_hours (Parametre alan hesaplama fonksiyonu)
+@app.get("/api/users/{user_id}/study-hours")
+def get_study_hours_endpoint(user_id: int, db: Session = Depends(get_db)):
+    """
+    Bir kullanıcının toplam çalışma saatini hesaplayan SQL fonksiyonu.
+    Fonksiyon adı: calculate_study_hours(p_user_id INT)
+    Parametre: Kullanıcı ID'si
+    """
+    try:
+        query = text("SELECT calculate_study_hours(:user_id) as total_hours")
+        result = db.execute(query, {"user_id": user_id}).fetchone()
+        
+        total_hours = float(result.total_hours) if result.total_hours else 0
+        return {
+            "user_id": user_id,
+            "total_study_hours": round(total_hours, 2),
+            "total_study_minutes": int(total_hours * 60),
+            "message": f"Toplam çalışma süresi: {int(total_hours)} saat {int((total_hours % 1) * 60)} dakika"
+        }
+    except Exception as e:
+        print(f"Hata: {e}")
+        return {"error": str(e)}
+
+# FONKSIYON 3: check_availability (Mekan ve saat kontrolü)
+@app.get("/api/spots/{spot_id}/check-available")
+def check_spot_available_endpoint(
+    spot_id: int, 
+    start: str = None,
+    end: str = None,
+    seat_number: int = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Belirtilen mekan, saat aralığı ve koltuk numarasının müsait olup olmadığını kontrol eder.
+    """
+    try:
+        if not start or not end or not seat_number:
+            raise HTTPException(status_code=400, detail="start, end, seat_number parametreleri gerekli!")
+        
+        # Doğrudan SQL sorgusu - çakışma varsa True, yoksa False dön
+        query = text("""
+            SELECT COUNT(*) as conflict_count
+            FROM reservations
+            WHERE spot_id = :spot_id 
+              AND seat_number = :seat_number
+              AND status != 'İPTAL'
+              AND (start_time, end_time) OVERLAPS (CAST(:start AS TIMESTAMP), CAST(:end AS TIMESTAMP))
+        """)
+        
+        result = db.execute(query, {
+            "spot_id": spot_id,
+            "seat_number": int(seat_number),
+            "start": start,
+            "end": end
+        }).fetchone()
+        
+        conflict_count = result.conflict_count if result else 0
+        is_available = conflict_count == 0  # Çakışma yoksa müsait
+        
+        return {
+            "spot_id": spot_id,
+            "seat_number": seat_number,
+            "is_available": is_available,
+            "message": f"{seat_number} numaralı koltuk {'müsait ✅' if is_available else 'dolu ❌'}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"check_availability Hatası: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Hata: {str(e)}")
