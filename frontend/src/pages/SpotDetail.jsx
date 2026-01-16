@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Container, Grid, Typography, Box, Paper, Chip, Button,
     Avatar, Rating, Divider, List, ListItem, ListItemAvatar, ListItemText,
-    TextField, FormControl, InputLabel, Select, MenuItem, Alert
+    TextField, FormControl, InputLabel, Select, MenuItem, Alert, Table, TableBody, TableCell, TableHead, TableRow
 } from '@mui/material';
 import { Service } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -95,6 +95,21 @@ const SpotDetail = () => {
         }
     };
 
+    const [spotHistory, setSpotHistory] = useState([]);
+
+    useEffect(() => {
+        const loadHistory = async () => {
+            try {
+                // SQL FONKSİYON 1 ÇAĞRISI: get_spot_history
+                const history = await Service.getSpotHistory(spot.id);
+                setSpotHistory(history);
+            } catch (error) {
+                console.error("Geçmiş yüklenemedi", error);
+            }
+        };
+        if (spot?.id) loadHistory();
+    }, [spot?.id]);
+
     if (!spot) return <Typography sx={{ mt: 10, textAlign: 'center' }}>Yükleniyor...</Typography>;
 
     return (
@@ -167,6 +182,34 @@ const SpotDetail = () => {
                                 const isOccupied = occupiedSeats.includes(seatNum); // Dolu mu?
                                 const isSelected = selectedSeat === seatNum;
 
+                                // SQL FONKSİYON 3: Koltuk müsaitlik kontrolü
+                                const handleSeatClick = async () => {
+                                    if (isOccupied) return; // Doluysa tıklanmasın
+
+                                    if (!selectedDate || !startHour || !endHour) {
+                                        alert("Lütfen tarih ve saat aralığını seçiniz.");
+                                        return;
+                                    }
+
+                                    try {
+                                        const result = await Service.checkAvailability(
+                                            spot.id,
+                                            `${selectedDate}T${startHour}:00`,
+                                            `${selectedDate}T${endHour}:00`,
+                                            seatNum
+                                        );
+
+                                        if (result.is_available) {
+                                            setSelectedSeat(seatNum);
+                                            alert(`✅ ${result.message}`);
+                                        } else {
+                                            alert(`❌ ${result.message}`);
+                                        }
+                                    } catch (error) {
+                                        console.error("Müsaitlik kontrolü başarısız", error);
+                                    }
+                                };
+
                                 // Koordinat hesapları aynı...
                                 const angle = (index / spot.capacity) * 2 * Math.PI;
                                 const radius = 90;
@@ -176,7 +219,7 @@ const SpotDetail = () => {
                                 return (
                                     <Box
                                         key={index}
-                                        onClick={() => !isOccupied && setSelectedSeat(seatNum)} // Doluysa tıklanmasın
+                                        onClick={handleSeatClick}
                                         sx={{
                                             position: 'absolute',
                                             transform: `translate(${x}px, ${y}px)`,
@@ -270,6 +313,7 @@ const SpotDetail = () => {
                             </Alert>
                         )}
                     </Paper>
+
                 </Grid>
 
                 {/* ALT KISIM: YORUMLAR */}
@@ -312,6 +356,44 @@ const SpotDetail = () => {
                             <Alert severity="info" sx={{ bgcolor: '#e0f2fe' }}>Henüz yorum yapılmamış. İlk yorumu sen yap!</Alert>
                         )}
                     </Box>
+                </Grid>
+
+                {/* MEKAN RESERVASİYON GEÇMİŞİ */}
+                <Grid item size={{ xs: 12 }}>
+                    <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid #e2e8f0', mt: 4 }}>
+                        <Typography variant="h5" fontWeight="bold" mb={3}>📋 Mekan Rezervasyon Geçmişi</Typography>
+
+                        {spotHistory && spotHistory.length > 0 ? (
+                            <Table>
+                                <TableHead sx={{ bgcolor: '#f1f5f9' }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Kullanıcı</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Tarih & Saat</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Durum</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {spotHistory.map((res, idx) => (
+                                        <TableRow key={idx} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>{res.username}</TableCell>
+                                            <TableCell>{res.start_time}</TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={res.status}
+                                                    color={res.status === 'AKTİF' ? 'success' : 'default'}
+                                                    size="small"
+                                                />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <Typography color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                                Henüz rezervasyon yok.
+                            </Typography>
+                        )}
+                    </Paper>
                 </Grid>
             </Grid>
         </Container>

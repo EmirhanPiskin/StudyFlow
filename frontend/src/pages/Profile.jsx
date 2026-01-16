@@ -22,6 +22,24 @@ const Profile = () => {
         password: ''
     });
     const [message, setMessage] = useState(null);
+    const [studyStats, setStudyStats] = useState({
+        total_study_hours: 0,
+        total_study_minutes: 0,
+        message: ""
+    });
+
+    // SQL FONKSİYON 2: Çalışma saati hesapla
+    React.useEffect(() => {
+        const loadStudyHours = async () => {
+            try {
+                const stats = await Service.getStudyHours(user.id);
+                setStudyStats(stats);
+            } catch (error) {
+                console.error("İstatistik yüklenemedi", error);
+            }
+        };
+        if (user?.id) loadStudyHours();
+    }, [user?.id]);
 
     if (!user) return <Typography sx={{ mt: 5, textAlign: 'center' }}>Giriş yapmalısınız.</Typography>;
 
@@ -102,6 +120,23 @@ const Profile = () => {
                     {/* SEKME 1: SADE BİLGİLER */}
                     {tabIndex === 0 && (
                         <Stack spacing={3}>
+                            {/* SQL FONKSİYON 2 SONUCU: Çalışma Saati */}
+                            <Box
+                                display="flex"
+                                alignItems="center"
+                                gap={2}
+                                p={2}
+                                borderRadius={3}
+                                bgcolor="#e0f2f1"
+                            >
+                                <Avatar sx={{ bgcolor: '#009688', width: 50, height: 50, color: 'white' }}>⏱️</Avatar>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Toplam Çalışma Süresi</Typography>
+                                    <Typography variant="h5" fontWeight="bold">{studyStats.total_study_hours} Saat</Typography>
+                                    <Typography variant="caption" color="text.secondary">{studyStats.message}</Typography>
+                                </Box>
+                            </Box>
+
                             <Box
                                 display="flex"
                                 alignItems="center"

@@ -45,8 +45,9 @@ CREATE TABLE reservations (
     spot_id INT REFERENCES study_spots(spot_id) ON DELETE SET NULL,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
+    seat_number INT,
     status VARCHAR(20) CHECK (status IN ('AKTİF', 'İPTAL', 'TAMAMLANDI')) DEFAULT 'AKTİF',
-	has_reviewed BOOLEAN DEFAULT FALSE,
+    has_reviewed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -214,17 +215,17 @@ INSERT INTO study_spots (name, capacity, features, is_available, image_url) VALU
 ('Kafe Masası', 2, 'Priz, Kahve Yakın', TRUE, 'https://images.unsplash.com/photo-1554118811-1e0d58224f24');
 
 -- RESERVATIONS (10 Kayıt)
-INSERT INTO reservations (user_id, spot_id, start_time, end_time, status) VALUES
-(1, 1, '2023-12-01 10:00:00', '2023-12-01 12:00:00', 'TAMAMLANDI'),
-(3, 2, '2023-12-01 14:00:00', '2023-12-01 16:00:00', 'TAMAMLANDI'),
-(4, 3, '2023-12-02 09:00:00', '2023-12-02 11:00:00', 'İPTAL'),
-(5, 1, '2023-12-03 10:00:00', '2023-12-03 12:00:00', 'AKTİF'),
-(6, 4, '2023-12-04 13:00:00', '2023-12-04 15:00:00', 'İPTAL'), -- İptal sebebi: Oda kapalı
-(1, 5, '2023-12-05 08:00:00', '2023-12-05 10:00:00', 'AKTİF'),
-(7, 6, '2023-12-06 11:00:00', '2023-12-06 13:00:00', 'TAMAMLANDI'),
-(8, 7, '2023-12-07 15:00:00', '2023-12-07 17:00:00', 'AKTİF'),
-(9, 8, '2023-12-08 10:00:00', '2023-12-08 11:00:00', 'TAMAMLANDI'),
-(10, 9, '2023-12-09 09:00:00', '2023-12-09 18:00:00', 'AKTİF');
+INSERT INTO reservations (user_id, spot_id, start_time, end_time, seat_number, status) VALUES
+(1, 1, '2023-12-01 10:00:00', '2023-12-01 12:00:00', 1, 'TAMAMLANDI'),
+(3, 2, '2023-12-01 14:00:00', '2023-12-01 16:00:00', 2, 'TAMAMLANDI'),
+(4, 3, '2023-12-02 09:00:00', '2023-12-02 11:00:00', 1, 'İPTAL'),
+(5, 1, '2023-12-03 10:00:00', '2023-12-03 12:00:00', 3, 'AKTİF'),
+(6, 4, '2023-12-04 13:00:00', '2023-12-04 15:00:00', 1, 'İPTAL'),
+(1, 5, '2023-12-05 08:00:00', '2023-12-05 10:00:00', 5, 'AKTİF'),
+(7, 6, '2023-12-06 11:00:00', '2023-12-06 13:00:00', 1, 'TAMAMLANDI'),
+(8, 7, '2023-12-07 15:00:00', '2023-12-07 17:00:00', 1, 'AKTİF'),
+(9, 8, '2023-12-08 10:00:00', '2023-12-08 11:00:00', 1, 'TAMAMLANDI'),
+(10, 9, '2023-12-09 09:00:00', '2023-12-09 18:00:00', 2, 'AKTİF');
 
 -- REVIEWS (10 Kayıt)
 INSERT INTO reviews (user_id, spot_id, rating, comment) VALUES

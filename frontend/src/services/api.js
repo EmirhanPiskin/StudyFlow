@@ -24,6 +24,12 @@ export const Service = {
         const response = await api.delete(`/admin/delete-spot/${id}`);
         return response.data;
     },
+
+    // TRIGGER: Mekan Bakıma Alma (trg_auto_cancel_maintenance)
+    setSpotMaintenance: async (spotId, isMaintenance) => {
+        const response = await api.put(`/admin/spot/${spotId}/maintenance`, { is_maintenance: isMaintenance });
+        return response.data;
+    },
     // 1. MEKANLARI GETİR (Arama parametresi opsiyonel)
     getSpots: async (searchTerm = '') => {
         // Eğer arama varsa ?q=sessiz gibi istek atar, yoksa düz getirir
@@ -123,7 +129,28 @@ export const Service = {
     getOccupiedSeats: async (spotId, date, start, end) => {
         const response = await api.get(`/spots/${spotId}/occupied?date=${date}&start=${start}&end=${end}`);
         return response.data;
+    },
+
+    // --- SQL FONKSİYONLARI KULLANAN ÇAĞRILAR ---
+
+    // 1. SQL FONKSİYON: get_spot_history (CURSOR ve RECORD kullanıyor)
+    getSpotHistory: async (spotId) => {
+        const response = await api.get(`/spots/${spotId}/history`);
+        return response.data;
+    },
+
+    // 2. SQL FONKSİYON: calculate_study_hours (Parametre alan hesaplama)
+    getStudyHours: async (userId) => {
+        const response = await api.get(`/users/${userId}/study-hours`);
+        return response.data;
+    },
+
+    // 3. SQL FONKSİYON: check_availability (Mekan ve saat kontrolü)
+    checkAvailability: async (spotId, start, end, seatNumber) => {
+        const response = await api.get(
+            `/spots/${spotId}/check-available?start=${start}&end=${end}&seat_number=${seatNumber}`
+        );
+        return response.data;
     }
 };
-
 export default api;
